@@ -23,10 +23,10 @@ limitations under the License.
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-    <artifactId>dubbo-serialization-hessian2</artifactId>
+    <artifactId>dubbo-serialization-jackson</artifactId>
     <packaging>jar</packaging>
     <name>${project.artifactId}</name>
-    <description>The hessian2 serialization module of dubbo project</description>
+    <description>The jackson serialization module of dubbo project</description>
     <properties>
         <skip_maven_deploy>false</skip_maven_deploy>
     </properties>
@@ -37,8 +37,9 @@ limitations under the License.
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>hessian-lite</artifactId>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.13.4.2</version>
         </dependency>
     </dependencies>
 </project>

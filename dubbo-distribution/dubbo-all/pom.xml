@@ -463,6 +463,7 @@
                                     <include>org.apache.dubbo:dubbo-serialization-api</include>
                                     <include>org.apache.dubbo:dubbo-serialization-hessian2</include>
                                     <include>org.apache.dubbo:dubbo-serialization-fastjson2</include>
+                                    <include>org.apache.dubbo:dubbo-serialization-jackson</include>
                                     <include>org.apache.dubbo:dubbo-serialization-jdk</include>
                                     <include>org.apache.dubbo:dubbo-serialization</include>
                                     <include>org.apache.dubbo:dubbo-compiler</include>
