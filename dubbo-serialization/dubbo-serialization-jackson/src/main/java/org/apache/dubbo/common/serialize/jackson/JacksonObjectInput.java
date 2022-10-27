@@ -1,5 +1,6 @@
 package org.apache.dubbo.common.serialize.jackson;
 
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.dubbo.common.serialize.ObjectInput;
 
@@ -93,7 +94,11 @@ public class JacksonObjectInput implements ObjectInput {
         if (read != length) {
             throw new IllegalArgumentException("deserialize failed. expected read length: " + length + " but actual read: " + read);
         }
-        return this.objectMapper.readValue(bytes, cls);
+        if (null != type) {
+            return this.objectMapper.readValue(bytes, this.objectMapper.constructType(type));
+        } else {
+            return this.objectMapper.readValue(bytes, cls);
+        }
     }
 
     private int readLength() throws IOException {
