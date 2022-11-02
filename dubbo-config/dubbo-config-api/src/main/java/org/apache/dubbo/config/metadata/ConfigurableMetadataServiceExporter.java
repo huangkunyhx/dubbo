@@ -47,6 +47,7 @@ import static org.apache.dubbo.common.constants.CommonConstants.METADATA_SERVICE
 import static org.apache.dubbo.common.constants.CommonConstants.THREADPOOL_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.THREADS_KEY;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_FAILED_FIND_PROTOCOL;
+import static org.apache.dubbo.remoting.Constants.BIND_IP_KEY;
 import static org.apache.dubbo.remoting.Constants.BIND_PORT_KEY;
 
 /**
@@ -132,10 +133,22 @@ public class ConfigurableMetadataServiceExporter {
                             rawPort = addr.substring(addr.indexOf(":") + 1);
                         }
                         protocolConfig.setPort(Integer.parseInt(rawPort));
+
+                        String host = server.getUrl().getParameter(BIND_IP_KEY);
+                        if (!StringUtils.hasText(host)) {
+                            String addr = server.getAddress();
+                            host = addr.substring(0, addr.indexOf(":"));
+                        }
+                        protocolConfig.setHost(host);
                     } else {
-                        Integer protocolPort = getProtocolConfig(specifiedProtocol).getPort();
+                        ProtocolConfig specifiedProtocolConfig = getProtocolConfig(specifiedProtocol);
+                        Integer protocolPort = specifiedProtocolConfig.getPort();
                         if (null != protocolPort && protocolPort != -1) {
                             protocolConfig.setPort(protocolPort);
+                        }
+                        String host = specifiedProtocolConfig.getHost();
+                        if (StringUtils.hasText(host)) {
+                            protocolConfig.setHost(host);
                         }
                     }
                 }
