@@ -1,13 +1,15 @@
 package org.apache.dubbo.common.serialize.jackson;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.serialize.ObjectInput;
 import org.apache.dubbo.common.serialize.ObjectOutput;
 import org.apache.dubbo.common.serialize.Serialization;
-import org.apache.dubbo.common.serialize.jackson.json.ThrowableJsonDeserializer;
-import org.apache.dubbo.common.serialize.jackson.json.ThrowableJsonSerializer;
+import org.apache.dubbo.common.serialize.jackson.throwable.ThrowableJsonDeserializer;
+import org.apache.dubbo.common.serialize.jackson.throwable.ThrowableJsonSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,9 +29,12 @@ public class JacksonSerialization implements Serialization {
     private final ObjectMapper objectMapper;
 
     public JacksonSerialization() {
+        ObjectMapper throwableObjectMapper = new ObjectMapper();
+        throwableObjectMapper.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
+
         SimpleModule simpleModule = new SimpleModule();
-        simpleModule.addSerializer(Throwable.class, ThrowableJsonSerializer.INSTANCE);
-        simpleModule.addDeserializer(Throwable.class, ThrowableJsonDeserializer.INSTANCE);
+        simpleModule.addSerializer(Throwable.class, new ThrowableJsonSerializer(throwableObjectMapper));
+        simpleModule.addDeserializer(Throwable.class, new ThrowableJsonDeserializer(throwableObjectMapper));
 
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(simpleModule);
