@@ -1,6 +1,5 @@
 package org.apache.dubbo.common.serialize.jackson;
 
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.dubbo.common.serialize.ObjectInput;
 
@@ -84,6 +83,11 @@ public class JacksonObjectInput implements ObjectInput {
     @Override
     public <T> T readObject(Class<T> cls) throws IOException {
         return this.readObject(cls, null);
+    }
+
+    @Override
+    public Throwable readThrowable() throws IOException, ClassNotFoundException {
+        return this.readObject(Throwable.class);
     }
 
     @Override
