@@ -1,8 +1,6 @@
 package org.apache.dubbo.common.serialize.jackson;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.serialize.ObjectInput;
@@ -29,12 +27,9 @@ public class JacksonSerialization implements Serialization {
     private final ObjectMapper objectMapper;
 
     public JacksonSerialization() {
-        ObjectMapper throwableObjectMapper = new ObjectMapper();
-        throwableObjectMapper.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
-
         SimpleModule simpleModule = new SimpleModule();
-        simpleModule.addSerializer(Throwable.class, new ThrowableJsonSerializer(throwableObjectMapper));
-        simpleModule.addDeserializer(Throwable.class, new ThrowableJsonDeserializer(throwableObjectMapper));
+        simpleModule.addSerializer(Throwable.class, new ThrowableJsonSerializer());
+        simpleModule.addDeserializer(Throwable.class, new ThrowableJsonDeserializer());
 
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(simpleModule);
