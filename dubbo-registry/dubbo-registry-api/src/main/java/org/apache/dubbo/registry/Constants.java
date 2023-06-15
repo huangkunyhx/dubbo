@@ -109,6 +109,8 @@ public interface Constants {
 
     String MIGRATION_THRESHOLD_KEY = "migration.threshold";
 
+    String ENABLE_26X_CONFIGURATION_LISTEN = "enable-26x-configuration-listen";
+
     String ENABLE_CONFIGURATION_LISTEN = "enable-configuration-listen";
 
     /**
@@ -135,4 +137,12 @@ public interface Constants {
     String DUBBO_REGISTRY  = "/.dubbo/dubbo-registry-";
 
     String CACHE = ".cache";
+
+    int DEFAULT_CAS_RETRY_TIMES = 10;
+
+    String CAS_RETRY_TIMES_KEY = "dubbo.metadata-report.cas-retry-times";
+
+    int DEFAULT_CAS_RETRY_WAIT_TIME = 100;
+
+    String CAS_RETRY_WAIT_TIME_KEY = "dubbo.metadata-report.cas-retry-wait-time";
 }

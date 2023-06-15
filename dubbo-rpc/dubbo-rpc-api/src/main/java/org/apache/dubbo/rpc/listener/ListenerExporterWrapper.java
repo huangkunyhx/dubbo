@@ -16,7 +16,7 @@
  */
 package org.apache.dubbo.rpc.listener;
 
-import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.utils.CollectionUtils;
 import org.apache.dubbo.rpc.Exporter;
@@ -26,12 +26,14 @@ import org.apache.dubbo.rpc.Invoker;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.COMMON_FAILED_NOTIFY_EVENT;
+
 /**
  * ListenerExporter
  */
 public class ListenerExporterWrapper<T> implements Exporter<T> {
 
-    private static final Logger logger = LoggerFactory.getLogger(ListenerExporterWrapper.class);
+    private static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(ListenerExporterWrapper.class);
 
     private final Exporter<T> exporter;
 
@@ -60,6 +62,16 @@ public class ListenerExporterWrapper<T> implements Exporter<T> {
         }
     }
 
+    @Override
+    public void register() {
+        exporter.register();
+    }
+
+    @Override
+    public void unregister() {
+        exporter.unregister();
+    }
+
     private void listenerEvent(Consumer<ExporterListener> consumer) {
         if (CollectionUtils.isNotEmpty(listeners)) {
             RuntimeException exception = null;
@@ -68,7 +80,7 @@ public class ListenerExporterWrapper<T> implements Exporter<T> {
                     try {
                         consumer.accept(listener);
                     } catch (RuntimeException t) {
-                        logger.error(t.getMessage(), t);
+                        logger.error(COMMON_FAILED_NOTIFY_EVENT, "", "", t.getMessage(), t);
                         exception = t;
                     }
                 }

@@ -17,7 +17,9 @@
 
 package org.apache.dubbo.rpc.protocol.tri.transport;
 
-import org.apache.dubbo.common.logger.Logger;
+import io.netty.handler.codec.http2.DefaultHttp2ResetFrame;
+import io.netty.handler.codec.http2.Http2Error;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 
 import io.netty.channel.ChannelHandlerContext;
@@ -32,10 +34,11 @@ import java.net.SocketException;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.PROTOCOL_FAILED_RESPONSE;
 import static org.apache.dubbo.rpc.protocol.tri.transport.GracefulShutdown.GRACEFUL_SHUTDOWN_PING;
 
 public class TripleServerConnectionHandler extends Http2ChannelDuplexHandler {
-    private static final Logger logger = LoggerFactory.getLogger(TripleServerConnectionHandler.class);
+    private static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(TripleServerConnectionHandler.class);
     // Some exceptions are not very useful and add too much noise to the log
     private static final Set<String> QUIET_EXCEPTIONS = new HashSet<>();
     private static final Set<Class<?>> QUIET_EXCEPTIONS_CLASS = new HashSet<>();
@@ -54,7 +57,7 @@ public class TripleServerConnectionHandler extends Http2ChannelDuplexHandler {
             if (((Http2PingFrame) msg).content() == GRACEFUL_SHUTDOWN_PING) {
                 if (gracefulShutdown == null) {
                     // this should never happen
-                    logger.warn("Received GRACEFUL_SHUTDOWN_PING Ack but gracefulShutdown is null");
+                    logger.warn(PROTOCOL_FAILED_RESPONSE, "", "", "Received GRACEFUL_SHUTDOWN_PING Ack but gracefulShutdown is null");
                 } else {
                     gracefulShutdown.secondGoAwayAndClose(ctx);
                 }
@@ -64,6 +67,17 @@ public class TripleServerConnectionHandler extends Http2ChannelDuplexHandler {
         } else {
             super.channelRead(ctx, msg);
         }
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        //reset all active stream on connection close
+        forEachActiveStream(stream -> {
+            DefaultHttp2ResetFrame resetFrame = new DefaultHttp2ResetFrame(Http2Error.NO_ERROR).stream(stream);
+            ctx.fireChannelRead(resetFrame);
+            return true;
+        });
     }
 
     private boolean isQuiteException(Throwable t) {
@@ -86,7 +100,7 @@ public class TripleServerConnectionHandler extends Http2ChannelDuplexHandler {
                 logger.debug(String.format("Channel:%s Error", ctx.channel()), cause);
             }
         } else {
-            logger.warn(String.format("Channel:%s Error", ctx.channel()), cause);
+            logger.warn(PROTOCOL_FAILED_RESPONSE, "", "", String.format("Channel:%s Error", ctx.channel()), cause);
         }
         ctx.close();
     }

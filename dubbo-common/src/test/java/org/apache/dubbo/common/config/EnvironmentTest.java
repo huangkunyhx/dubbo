@@ -35,10 +35,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * {@link Environment}
  */
-public class EnvironmentTest {
+class EnvironmentTest {
 
     @Test
-    public void testResolvePlaceholders() {
+    void testResolvePlaceholders() {
         Environment environment = ApplicationModel.defaultModel().getModelEnvironment();
 
         Map<String, String> externalMap = new LinkedHashMap<>();
@@ -62,9 +62,9 @@ public class EnvironmentTest {
     }
 
     @Test
-    public void test() {
+    void test() {
         FrameworkModel frameworkModel = new FrameworkModel();
-        ApplicationModel applicationModel = new ApplicationModel(frameworkModel);
+        ApplicationModel applicationModel = frameworkModel.newApplication();
         Environment environment = applicationModel.getModelEnvironment();
 
         // test getPrefixedConfiguration
@@ -77,11 +77,11 @@ public class EnvironmentTest {
 
         // test getConfigurationMaps(AbstractConfig config, String prefix)
         List<Map<String, String>> configurationMaps = environment.getConfigurationMaps(registryConfig, prefix);
-        Assertions.assertEquals(configurationMaps.size(), 7);
+        Assertions.assertEquals(7, configurationMaps.size());
 
         // test getConfigurationMaps()
         configurationMaps = environment.getConfigurationMaps();
-        Assertions.assertEquals(configurationMaps.size(), 6);
+        Assertions.assertEquals(6, configurationMaps.size());
 
         CompositeConfiguration configuration1 = environment.getConfiguration();
         CompositeConfiguration configuration2 = environment.getConfiguration();

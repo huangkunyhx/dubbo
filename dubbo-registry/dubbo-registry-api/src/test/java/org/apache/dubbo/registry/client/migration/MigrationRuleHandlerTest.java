@@ -25,15 +25,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class MigrationRuleHandlerTest {
+class MigrationRuleHandlerTest {
     @Test
-    public void test() {
-        MigrationClusterInvoker invoker = Mockito.mock(MigrationClusterInvoker.class);
+    void test() {
+        MigrationClusterInvoker<?> invoker = Mockito.mock(MigrationClusterInvoker.class);
         URL url = Mockito.mock(URL.class);
         Mockito.when(url.getDisplayServiceKey()).thenReturn("test");
         Mockito.when(url.getParameter(Mockito.any(), (String) Mockito.any())).thenAnswer(i->i.getArgument(1));
         Mockito.when(url.getOrDefaultApplicationModel()).thenReturn(ApplicationModel.defaultModel());
-        MigrationRuleHandler handler = new MigrationRuleHandler(invoker, url);
+        MigrationRuleHandler<?> handler = new MigrationRuleHandler<>(invoker, url);
 
         Mockito.when(invoker.migrateToForceApplicationInvoker(Mockito.any())).thenReturn(true);
         Mockito.when(invoker.migrateToForceInterfaceInvoker(Mockito.any())).thenReturn(true);
@@ -61,7 +61,7 @@ public class MigrationRuleHandlerTest {
         testMigrationWithStepUnchanged(rule, url, handler, invoker);
     }
 
-    private void testMigrationFailed(MigrationRule rule, URL url, MigrationRuleHandler handler, MigrationClusterInvoker invoker) {
+    private void testMigrationFailed(MigrationRule rule, URL url, MigrationRuleHandler<?> handler, MigrationClusterInvoker<?> invoker) {
         Assertions.assertEquals(MigrationStep.FORCE_INTERFACE, handler.getMigrationStep());
 
         Mockito.when(invoker.migrateToForceApplicationInvoker(Mockito.any())).thenReturn(false);
@@ -72,7 +72,7 @@ public class MigrationRuleHandlerTest {
         Assertions.assertEquals(MigrationStep.FORCE_INTERFACE, handler.getMigrationStep());
     }
 
-    private void testMigrationWithStepUnchanged(MigrationRule rule, URL url, MigrationRuleHandler handler, MigrationClusterInvoker invoker) {
+    private void testMigrationWithStepUnchanged(MigrationRule rule, URL url, MigrationRuleHandler<?> handler, MigrationClusterInvoker<?> invoker) {
         // set the same as
         Mockito.when(rule.getStep(url)).thenReturn(handler.getMigrationStep());
         handler.doMigrate(rule);

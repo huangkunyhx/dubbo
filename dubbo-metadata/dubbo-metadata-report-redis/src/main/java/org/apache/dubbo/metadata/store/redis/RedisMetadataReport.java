@@ -17,7 +17,7 @@
 package org.apache.dubbo.metadata.store.redis;
 
 import org.apache.dubbo.common.URL;
-import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.utils.StringUtils;
 import org.apache.dubbo.metadata.report.identifier.BaseMetadataIdentifier;
@@ -45,6 +45,7 @@ import java.util.Set;
 import static org.apache.dubbo.common.constants.CommonConstants.CLUSTER_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.DEFAULT_TIMEOUT;
 import static org.apache.dubbo.common.constants.CommonConstants.TIMEOUT_KEY;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.TRANSPORT_FAILED_RESPONSE;
 import static org.apache.dubbo.metadata.MetadataConstants.META_DATA_STORE_TAG;
 
 /**
@@ -53,7 +54,7 @@ import static org.apache.dubbo.metadata.MetadataConstants.META_DATA_STORE_TAG;
 public class RedisMetadataReport extends AbstractMetadataReport {
 
     private static final String REDIS_DATABASE_KEY = "database";
-    private static final Logger logger = LoggerFactory.getLogger(RedisMetadataReport.class);
+    private static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(RedisMetadataReport.class);
 
     // protected , for test
     protected JedisPool pool;
@@ -65,6 +66,7 @@ public class RedisMetadataReport extends AbstractMetadataReport {
     public RedisMetadataReport(URL url) {
         super(url);
         timeout = url.getParameter(TIMEOUT_KEY, DEFAULT_TIMEOUT);
+        password = url.getPassword();
         if (url.getParameter(CLUSTER_KEY, false)) {
             jedisClusterNodes = new HashSet<>();
             List<URL> urls = url.getBackupUrls();
@@ -73,7 +75,7 @@ public class RedisMetadataReport extends AbstractMetadataReport {
             }
         } else {
             int database = url.getParameter(REDIS_DATABASE_KEY, 0);
-            pool = new JedisPool(new JedisPoolConfig(), url.getHost(), url.getPort(), timeout, url.getPassword(), database);
+            pool = new JedisPool(new JedisPoolConfig(), url.getHost(), url.getPort(), timeout, password, database);
         }
     }
 
@@ -130,11 +132,12 @@ public class RedisMetadataReport extends AbstractMetadataReport {
     }
 
     private void storeMetadataInCluster(BaseMetadataIdentifier metadataIdentifier, String v) {
-        try (JedisCluster jedisCluster = new JedisCluster(jedisClusterNodes, timeout, timeout, 2, password, new GenericObjectPoolConfig())) {
+        try (JedisCluster jedisCluster = new JedisCluster(jedisClusterNodes, timeout, timeout, 2, password, new GenericObjectPoolConfig<>())) {
             jedisCluster.set(metadataIdentifier.getIdentifierKey() + META_DATA_STORE_TAG, v);
         } catch (Throwable e) {
-            logger.error("Failed to put " + metadataIdentifier + " to redis cluster " + v + ", cause: " + e.getMessage(), e);
-            throw new RpcException("Failed to put " + metadataIdentifier + " to redis cluster " + v + ", cause: " + e.getMessage(), e);
+            String msg = "Failed to put " + metadataIdentifier + " to redis cluster " + v + ", cause: " + e.getMessage();
+            logger.error(TRANSPORT_FAILED_RESPONSE, "", "", msg, e);
+            throw new RpcException(msg, e);
         }
     }
 
@@ -142,8 +145,9 @@ public class RedisMetadataReport extends AbstractMetadataReport {
         try (Jedis jedis = pool.getResource()) {
             jedis.set(metadataIdentifier.getUniqueKey(KeyTypeEnum.UNIQUE_KEY), v);
         } catch (Throwable e) {
-            logger.error("Failed to put " + metadataIdentifier + " to redis " + v + ", cause: " + e.getMessage(), e);
-            throw new RpcException("Failed to put " + metadataIdentifier + " to redis " + v + ", cause: " + e.getMessage(), e);
+            String msg = "Failed to put " + metadataIdentifier + " to redis " + v + ", cause: " + e.getMessage();
+            logger.error(TRANSPORT_FAILED_RESPONSE, "", "", msg, e);
+            throw new RpcException(msg, e);
         }
     }
 
@@ -156,11 +160,12 @@ public class RedisMetadataReport extends AbstractMetadataReport {
     }
 
     private void deleteMetadataInCluster(BaseMetadataIdentifier metadataIdentifier) {
-        try (JedisCluster jedisCluster = new JedisCluster(jedisClusterNodes, timeout, timeout, 2, password, new GenericObjectPoolConfig())) {
+        try (JedisCluster jedisCluster = new JedisCluster(jedisClusterNodes, timeout, timeout, 2, password, new GenericObjectPoolConfig<>())) {
             jedisCluster.del(metadataIdentifier.getIdentifierKey() + META_DATA_STORE_TAG);
         } catch (Throwable e) {
-            logger.error("Failed to delete " + metadataIdentifier + " from redis cluster , cause: " + e.getMessage(), e);
-            throw new RpcException("Failed to delete " + metadataIdentifier + " from redis cluster , cause: " + e.getMessage(), e);
+            String msg = "Failed to delete " + metadataIdentifier + " from redis cluster , cause: " + e.getMessage();
+            logger.error(TRANSPORT_FAILED_RESPONSE, "", "", msg, e);
+            throw new RpcException(msg, e);
         }
     }
 
@@ -168,8 +173,9 @@ public class RedisMetadataReport extends AbstractMetadataReport {
         try (Jedis jedis = pool.getResource()) {
             jedis.del(metadataIdentifier.getUniqueKey(KeyTypeEnum.UNIQUE_KEY));
         } catch (Throwable e) {
-            logger.error("Failed to delete " + metadataIdentifier + " from redis , cause: " + e.getMessage(), e);
-            throw new RpcException("Failed to delete " + metadataIdentifier + " from redis , cause: " + e.getMessage(), e);
+            String msg = "Failed to delete " + metadataIdentifier + " from redis , cause: " + e.getMessage();
+            logger.error(TRANSPORT_FAILED_RESPONSE, "", "", msg, e);
+            throw new RpcException(msg, e);
         }
     }
 
@@ -182,11 +188,12 @@ public class RedisMetadataReport extends AbstractMetadataReport {
     }
 
     private String getMetadataInCluster(BaseMetadataIdentifier metadataIdentifier) {
-        try (JedisCluster jedisCluster = new JedisCluster(jedisClusterNodes, timeout, timeout, 2, password, new GenericObjectPoolConfig())) {
+        try (JedisCluster jedisCluster = new JedisCluster(jedisClusterNodes, timeout, timeout, 2, password, new GenericObjectPoolConfig<>())) {
             return jedisCluster.get(metadataIdentifier.getIdentifierKey() + META_DATA_STORE_TAG);
         } catch (Throwable e) {
-            logger.error("Failed to get " + metadataIdentifier + " from redis cluster , cause: " + e.getMessage(), e);
-            throw new RpcException("Failed to get " + metadataIdentifier + " from redis cluster , cause: " + e.getMessage(), e);
+            String msg = "Failed to get " + metadataIdentifier + " from redis cluster , cause: " + e.getMessage();
+            logger.error(TRANSPORT_FAILED_RESPONSE, "", "", msg, e);
+            throw new RpcException(msg, e);
         }
     }
 
@@ -194,8 +201,9 @@ public class RedisMetadataReport extends AbstractMetadataReport {
         try (Jedis jedis = pool.getResource()) {
             return jedis.get(metadataIdentifier.getUniqueKey(KeyTypeEnum.UNIQUE_KEY));
         } catch (Throwable e) {
-            logger.error("Failed to get " + metadataIdentifier + " from redis , cause: " + e.getMessage(), e);
-            throw new RpcException("Failed to get " + metadataIdentifier + " from redis , cause: " + e.getMessage(), e);
+            String msg = "Failed to get " + metadataIdentifier + " from redis , cause: " + e.getMessage();
+            logger.error(TRANSPORT_FAILED_RESPONSE, "", "", msg, e);
+            throw new RpcException(msg, e);
         }
     }
 

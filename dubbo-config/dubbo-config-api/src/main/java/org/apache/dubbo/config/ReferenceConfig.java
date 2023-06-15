@@ -19,6 +19,7 @@ package org.apache.dubbo.config;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.Version;
 import org.apache.dubbo.common.constants.CommonConstants;
+import org.apache.dubbo.common.constants.LoggerCodeConstants;
 import org.apache.dubbo.common.constants.RegistryConstants;
 import org.apache.dubbo.common.extension.ExtensionLoader;
 import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
@@ -33,7 +34,6 @@ import org.apache.dubbo.common.utils.UrlUtils;
 import org.apache.dubbo.config.annotation.Reference;
 import org.apache.dubbo.config.support.Parameter;
 import org.apache.dubbo.config.utils.ConfigValidationUtils;
-import org.apache.dubbo.metadata.ServiceNameMapping;
 import org.apache.dubbo.registry.client.metadata.MetadataUtils;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Protocol;
@@ -44,6 +44,7 @@ import org.apache.dubbo.rpc.cluster.support.ClusterUtils;
 import org.apache.dubbo.rpc.cluster.support.registry.ZoneAwareCluster;
 import org.apache.dubbo.rpc.model.AsyncMethodInfo;
 import org.apache.dubbo.rpc.model.ConsumerModel;
+import org.apache.dubbo.rpc.model.DubboStub;
 import org.apache.dubbo.rpc.model.ModuleModel;
 import org.apache.dubbo.rpc.model.ModuleServiceRepository;
 import org.apache.dubbo.rpc.model.ScopeModel;
@@ -53,10 +54,11 @@ import org.apache.dubbo.rpc.service.GenericService;
 import org.apache.dubbo.rpc.stub.StubSuppliers;
 import org.apache.dubbo.rpc.support.ProtocolUtils;
 
+import java.beans.Transient;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,8 +85,8 @@ import static org.apache.dubbo.common.constants.CommonConstants.TRIPLE;
 import static org.apache.dubbo.common.constants.CommonConstants.UNLOAD_CLUSTER_RELATED;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CLUSTER_NO_VALID_PROVIDER;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_FAILED_DESTROY_INVOKER;
-import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_NO_METHOD_FOUND;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_FAILED_LOAD_ENV_VARIABLE;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_NO_METHOD_FOUND;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_PROPERTY_CONFLICT;
 import static org.apache.dubbo.common.constants.RegistryConstants.PROVIDED_BY;
 import static org.apache.dubbo.common.constants.RegistryConstants.SUBSCRIBED_SERVICE_NAMES_KEY;
@@ -218,7 +220,8 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
     }
 
     @Override
-    public T get() {
+    @Transient
+    public T get(boolean check) {
         if (destroyed) {
             throw new IllegalStateException("The invoker of ReferenceConfig(" + url + ") has already destroyed!");
         }
@@ -227,14 +230,51 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
             // ensure start module, compatible with old api usage
             getScopeModel().getDeployer().start();
 
-            synchronized (this) {
-                if (ref == null) {
-                    init();
-                }
-            }
+            init(check);
         }
 
         return ref;
+    }
+
+    @Override
+    public void checkOrDestroy(long timeout) {
+        if (!initialized || ref == null) {
+            return;
+        }
+        try {
+            checkInvokerAvailable(timeout);
+        } catch (Throwable t) {
+            logAndCleanup(t);
+            throw t;
+        }
+    }
+
+    private void logAndCleanup(Throwable t) {
+        try {
+            if (invoker != null) {
+                invoker.destroy();
+            }
+        } catch (Throwable destroy) {
+            logger.warn(CONFIG_FAILED_DESTROY_INVOKER, "", "", "Unexpected error occurred when destroy invoker of ReferenceConfig(" + url + ").", t);
+        }
+        if (consumerModel != null) {
+            ModuleServiceRepository repository = getScopeModel().getServiceRepository();
+            repository.unregisterConsumer(consumerModel);
+        }
+        initialized = false;
+        invoker = null;
+        ref = null;
+        consumerModel = null;
+        serviceMetadata.setTarget(null);
+        serviceMetadata.getAttributeMap().remove(PROXY_CLASS_REF);
+
+        // Thrown by checkInvokerAvailable().
+        if (t.getClass() == IllegalStateException.class &&
+            t.getMessage().contains("No provider available for the service")) {
+
+            // 2-2 - No provider available.
+            logger.error(CLUSTER_NO_VALID_PROVIDER, "server crashed", "", "No provider available.", t);
+        }
     }
 
     @Override
@@ -260,12 +300,22 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
     }
 
     protected synchronized void init() {
+        init(true);
+    }
+
+    protected synchronized void init(boolean check) {
         if (initialized && ref != null) {
             return;
         }
         try {
             if (!this.isRefreshed()) {
                 this.refresh();
+            }
+            //auto detect proxy type
+            String proxyType = getProxy();
+            if (StringUtils.isBlank(proxyType)
+                && DubboStub.class.isAssignableFrom(interfaceClass)) {
+                setProxy(CommonConstants.NATIVE_STUB);
             }
 
             // init serviceMetadata
@@ -276,8 +326,6 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
             serviceMetadata.generateServiceKey();
 
             Map<String, String> referenceParameters = appendConfig();
-            // init service-application mapping
-            initServiceAppsMapping(referenceParameters);
 
             ModuleServiceRepository repository = getScopeModel().getServiceRepository();
             ServiceDescriptor serviceDescriptor;
@@ -306,43 +354,15 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
             consumerModel.setProxyObject(ref);
             consumerModel.initMethodModels();
 
-            checkInvokerAvailable();
+            if (check) {
+                checkInvokerAvailable(0);
+            }
         } catch (Throwable t) {
-            try {
-                if (invoker != null) {
-                    invoker.destroy();
-                }
-            } catch (Throwable destroy) {
-                logger.warn(CONFIG_FAILED_DESTROY_INVOKER, "", "", "Unexpected error occurred when destroy invoker of ReferenceConfig(" + url + ").", t);
-            }
-            if (consumerModel != null) {
-                ModuleServiceRepository repository = getScopeModel().getServiceRepository();
-                repository.unregisterConsumer(consumerModel);
-            }
-            initialized = false;
-            invoker = null;
-            ref = null;
-            consumerModel = null;
-            serviceMetadata.setTarget(null);
-            serviceMetadata.getAttributeMap().remove(PROXY_CLASS_REF);
-
-            // Thrown by checkInvokerAvailable().
-            if (t.getClass() == IllegalStateException.class &&
-                t.getMessage().contains("No provider available for the service")) {
-
-                // 2-2 - No provider available.
-                logger.error(CLUSTER_NO_VALID_PROVIDER, "server crashed", "", "No provider available.", t);
-            }
+            logAndCleanup(t);
 
             throw t;
         }
         initialized = true;
-    }
-
-    private void initServiceAppsMapping(Map<String, String> referenceParameters) {
-        ServiceNameMapping serviceNameMapping = ServiceNameMapping.getDefaultExtension(getScopeModel());
-        URL url = new ServiceConfigURL(LOCAL_PROTOCOL, LOCALHOST_VALUE, 0, interfaceName, referenceParameters);
-        serviceNameMapping.initInterfaceAppMapping(url);
     }
 
     /**
@@ -389,7 +409,9 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
                 logger.warn(CONFIG_NO_METHOD_FOUND, "", "", "No method found in service interface: " + interfaceClass.getName());
                 map.put(METHODS_KEY, ANY_VALUE);
             } else {
-                map.put(METHODS_KEY, StringUtils.join(new HashSet<>(Arrays.asList(methods)), COMMA_SEPARATOR));
+                List<String> copyOfMethods = new ArrayList<>(Arrays.asList(methods));
+                copyOfMethods.sort(Comparator.naturalOrder());
+                map.put(METHODS_KEY, String.join(COMMA_SEPARATOR, copyOfMethods));
             }
         }
 
@@ -427,24 +449,18 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
 
     @SuppressWarnings({"unchecked"})
     private T createProxy(Map<String, String> referenceParameters) {
-        if (shouldJvmRefer(referenceParameters)) {
-            createInvokerForLocal(referenceParameters);
+        urls.clear();
+
+        meshModeHandleUrl(referenceParameters);
+
+        if (StringUtils.isNotEmpty(url)) {
+            // user specified URL, could be peer-to-peer address, or register center's address.
+            parseUrl(referenceParameters);
         } else {
-            urls.clear();
-
-            meshModeHandleUrl(referenceParameters);
-
-            if (StringUtils.isNotEmpty(url)) {
-                // user specified URL, could be peer-to-peer address, or register center's address.
-                parseUrl(referenceParameters);
-            } else {
-                // if protocols not in jvm checkRegistry
-                if (!LOCAL_PROTOCOL.equalsIgnoreCase(getProtocol())) {
-                    aggregateUrlFromRegistry(referenceParameters);
-                }
-            }
-            createInvokerForRemote();
+            // if protocols not in jvm checkRegistry
+            aggregateUrlFromRegistry(referenceParameters);
         }
+        createInvoker();
 
         if (logger.isInfoEnabled()) {
             logger.info("Referred dubbo service: [" + referenceParameters.get(INTERFACE_KEY) + "]." +
@@ -478,16 +494,21 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
             }
             return;
         }
-        // get pod namespace
-        String podNamespace;
-        if (StringUtils.isEmpty(System.getenv("POD_NAMESPACE"))) {
-            if (logger.isWarnEnabled()) {
-                logger.warn(CONFIG_FAILED_LOAD_ENV_VARIABLE, "", "", "Can not get env variable: POD_NAMESPACE, it may not be running in the K8S environment , " +
-                    "finally use 'default' replace.");
+
+        // get provider namespace if (@DubboReference, <reference provider-namespace="xx"/>) present
+        String podNamespace = referenceParameters.get(RegistryConstants.PROVIDER_NAMESPACE);
+
+        // get pod namespace from env if annotation not present the provider namespace
+        if (StringUtils.isEmpty(podNamespace)) {
+            if (StringUtils.isEmpty(System.getenv("POD_NAMESPACE"))) {
+                if (logger.isWarnEnabled()) {
+                    logger.warn(CONFIG_FAILED_LOAD_ENV_VARIABLE, "", "", "Can not get env variable: POD_NAMESPACE, it may not be running in the K8S environment , " +
+                            "finally use 'default' replace.");
+                }
+                podNamespace = "default";
+            } else {
+                podNamespace = System.getenv("POD_NAMESPACE");
             }
-            podNamespace = "default";
-        } else {
-            podNamespace = System.getenv("POD_NAMESPACE");
         }
 
         // In mesh mode, providedBy equals K8S Service name.
@@ -526,22 +547,6 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
         return true;
     }
 
-    /**
-     * Make a local reference, create a local invoker.
-     *
-     * @param referenceParameters
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void createInvokerForLocal(Map<String, String> referenceParameters) {
-        URL url = new ServiceConfigURL(LOCAL_PROTOCOL, LOCALHOST_VALUE, 0, interfaceClass.getName(), referenceParameters);
-        url = url.setScopeModel(getScopeModel());
-        url = url.setServiceModel(consumerModel);
-        invoker = protocolSPI.refer(interfaceClass, url);
-
-        if (logger.isInfoEnabled()) {
-            logger.info("Using in jvm service " + interfaceClass.getName());
-        }
-    }
 
     /**
      * Parse the directly configured url.
@@ -581,8 +586,17 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
                 }
                 u = u.setScopeModel(getScopeModel());
                 u = u.setServiceModel(consumerModel);
+                if (isInjvm() != null && isInjvm()) {
+                    u = u.addParameter(LOCAL_PROTOCOL, true);
+                }
                 urls.add(u.putAttribute(REFER_KEY, referenceParameters));
             }
+        }
+        if (urls.isEmpty() && shouldJvmRefer(referenceParameters)) {
+            URL injvmUrl = new URL(LOCAL_PROTOCOL,LOCALHOST_VALUE,0,interfaceClass.getName()).addParameters(referenceParameters);
+            injvmUrl = injvmUrl.setScopeModel(getScopeModel());
+            injvmUrl = injvmUrl.setServiceModel(consumerModel);
+            urls.add(injvmUrl.putAttribute(REFER_KEY, referenceParameters));
         }
         if (urls.isEmpty()) {
             throw new IllegalStateException(
@@ -594,10 +608,10 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
 
 
     /**
-     * Make a remote reference, create a remote reference invoker
+     * \create a reference invoker
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void createInvokerForRemote() {
+    private void createInvoker() {
         if (urls.size() == 1) {
             URL curUrl = urls.get(0);
             invoker = protocolSPI.refer(interfaceClass, curUrl);
@@ -606,7 +620,7 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
                     !curUrl.getParameter(UNLOAD_CLUSTER_RELATED, false)) {
                 List<Invoker<?>> invokers = new ArrayList<>();
                 invokers.add(invoker);
-                invoker = Cluster.getCluster(scopeModel, Cluster.DEFAULT).join(new StaticDirectory(curUrl, invokers), true);
+                invoker = Cluster.getCluster(getScopeModel(), Cluster.DEFAULT).join(new StaticDirectory(curUrl, invokers), true);
             }
         } else {
             List<Invoker<?>> invokers = new ArrayList<>();
@@ -636,13 +650,36 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
                 }
                 URL curUrl = invokers.get(0).getUrl();
                 String cluster = curUrl.getParameter(CLUSTER_KEY, Cluster.DEFAULT);
-                invoker = Cluster.getCluster(scopeModel, cluster).join(new StaticDirectory(curUrl, invokers), true);
+                invoker = Cluster.getCluster(getScopeModel(), cluster).join(new StaticDirectory(curUrl, invokers), true);
             }
         }
     }
 
-    private void checkInvokerAvailable() throws IllegalStateException {
-        if (shouldCheck() && !invoker.isAvailable()) {
+    private void checkInvokerAvailable(long timeout) throws IllegalStateException {
+        if (!shouldCheck()) {
+            return;
+        }
+        boolean available = invoker.isAvailable();
+        if (available) {
+            return;
+        }
+
+        long startTime = System.currentTimeMillis();
+        long checkDeadline = startTime + timeout;
+        do {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+            available = invoker.isAvailable();
+        } while (!available && checkDeadline > System.currentTimeMillis());
+        logger.warn(LoggerCodeConstants.REGISTRY_EMPTY_ADDRESS, "", "",
+            "Check reference of [" + getUniqueServiceName() + "] failed very beginning. " +
+                "After " + (System.currentTimeMillis() - startTime) + "ms reties, finally " +
+                (available ? "succeed" : "failed") + ".");
+        if (!available) {
             // 2-2 - No provider available.
 
             IllegalStateException illegalStateException = new IllegalStateException("Failed to check the status of the service "
@@ -706,6 +743,10 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
         checkStubAndLocal(interfaceClass);
         ConfigValidationUtils.checkMock(interfaceClass, this);
 
+        if (StringUtils.isEmpty(url)) {
+            checkRegistry();
+        }
+
         resolveFile();
         ConfigValidationUtils.validateReferenceConfig(this);
         postProcessConfig();
@@ -763,10 +804,12 @@ public class ReferenceConfig<T> extends ReferenceConfigBase<T> {
      * @return
      */
     @Deprecated
+    @Transient
     public Invoker<?> getInvoker() {
         return invoker;
     }
 
+    @Transient
     public Runnable getDestroyRunner() {
         return this::destroy;
     }

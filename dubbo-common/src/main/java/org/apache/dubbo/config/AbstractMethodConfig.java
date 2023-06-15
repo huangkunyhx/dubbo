@@ -22,7 +22,10 @@ import org.apache.dubbo.rpc.model.ApplicationModel;
 import org.apache.dubbo.rpc.model.ModuleModel;
 import org.apache.dubbo.rpc.model.ScopeModel;
 
+import java.beans.Transient;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * AbstractMethodConfig
@@ -100,7 +103,7 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
     protected Integer forks;
 
     public AbstractMethodConfig() {
-        super(ApplicationModel.defaultModel().getDefaultModule());
+        super();
     }
 
     public AbstractMethodConfig(ModuleModel moduleModel) {
@@ -108,8 +111,15 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
     }
 
     @Override
+    @Transient
     public ModuleModel getScopeModel() {
-        return (ModuleModel) scopeModel;
+        return (ModuleModel) super.getScopeModel();
+    }
+
+    @Override
+    @Transient
+    protected ScopeModel getDefaultModel() {
+        return ApplicationModel.defaultModel().getDefaultModule();
     }
 
     @Override
@@ -122,6 +132,7 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
         }
     }
 
+    @Transient
     protected ModuleConfigManager getModuleConfigManager() {
         return getScopeModel().getConfigManager();
     }
@@ -231,7 +242,8 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
     }
 
     public Map<String, String> getParameters() {
-        return parameters;
+        this.parameters = Optional.ofNullable(this.parameters).orElseGet(HashMap::new);
+        return this.parameters;
     }
 
     public void setParameters(Map<String, String> parameters) {

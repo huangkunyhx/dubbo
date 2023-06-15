@@ -29,7 +29,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 /**
  * Created by LinShunkang on 2020/03/12
  */
-public class URLStrParserTest {
+class URLStrParserTest {
     private static Set<String> testCases = new HashSet<>(16);
     private static Set<String> errorDecodedCases = new HashSet<>(8);
     private static Set<String> errorEncodedCases = new HashSet<>(8);
@@ -44,6 +44,9 @@ public class URLStrParserTest {
         testCases.add("file:/path/to/file.txt");
         testCases.add("dubbo://fe80:0:0:0:894:aeec:f37d:23e1%en0/path?abc=abc");
         testCases.add("dubbo://[fe80:0:0:0:894:aeec:f37d:23e1]:20880/path?abc=abc");
+        testCases.add("nacos://192.168.1.1:8848?username=&password=");
+        testCases.add("dubbo://127.0.0.1?timeout=1234&default.timeout=5678");
+        testCases.add("dubbo://127.0.0.1?default.timeout=5678");
 
         errorDecodedCases.add("dubbo:192.168.1.1");
         errorDecodedCases.add("://192.168.1.1");
@@ -57,7 +60,7 @@ public class URLStrParserTest {
     }
 
     @Test
-    public void testEncoded() {
+    void testEncoded() {
         testCases.forEach(testCase -> {
             assertThat(URLStrParser.parseEncodedStr(URL.encode(testCase)), equalTo(URL.valueOf(testCase)));
         });
@@ -69,7 +72,7 @@ public class URLStrParserTest {
     }
 
     @Test
-    public void testDecoded() {
+    void testDecoded() {
         testCases.forEach(testCase -> {
             assertThat(URLStrParser.parseDecodedStr(testCase), equalTo(URL.valueOf(testCase)));
         });
@@ -78,6 +81,17 @@ public class URLStrParserTest {
             Assertions.assertThrows(RuntimeException.class,
                     () -> URLStrParser.parseDecodedStr(errorCase));
         });
+    }
+
+    @Test
+    void testDefault() {
+        URL url1 = URLStrParser.parseEncodedStr(URL.encode("dubbo://127.0.0.1?timeout=1234&default.timeout=5678"));
+        assertThat(url1.getParameter("timeout"), equalTo("1234"));
+        assertThat(url1.getParameter("default.timeout"), equalTo("5678"));
+
+        URL url2 = URLStrParser.parseEncodedStr(URL.encode("dubbo://127.0.0.1?default.timeout=5678"));
+        assertThat(url2.getParameter("timeout"), equalTo("5678"));
+        assertThat(url2.getParameter("default.timeout"), equalTo("5678"));
     }
 
 }

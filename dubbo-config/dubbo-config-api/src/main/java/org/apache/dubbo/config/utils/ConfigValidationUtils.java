@@ -26,6 +26,7 @@ import org.apache.dubbo.common.serialize.Serialization;
 import org.apache.dubbo.common.status.StatusChecker;
 import org.apache.dubbo.common.status.reporter.FrameworkStatusReportService;
 import org.apache.dubbo.common.threadpool.ThreadPool;
+import org.apache.dubbo.common.utils.ClassUtils;
 import org.apache.dubbo.common.utils.CollectionUtils;
 import org.apache.dubbo.common.utils.ConfigUtils;
 import org.apache.dubbo.common.utils.NetUtils;
@@ -47,6 +48,7 @@ import org.apache.dubbo.config.ReferenceConfig;
 import org.apache.dubbo.config.RegistryConfig;
 import org.apache.dubbo.config.ServiceConfig;
 import org.apache.dubbo.config.SslConfig;
+import org.apache.dubbo.config.TracingConfig;
 import org.apache.dubbo.monitor.MonitorFactory;
 import org.apache.dubbo.monitor.MonitorService;
 import org.apache.dubbo.registry.RegistryService;
@@ -99,6 +101,7 @@ import static org.apache.dubbo.common.constants.CommonConstants.SHUTDOWN_WAIT_SE
 import static org.apache.dubbo.common.constants.CommonConstants.THREADPOOL_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.USERNAME_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.VERSION_KEY;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.COMMON_CLASS_NOT_FOUND;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_PARAMETER_FORMAT_ERROR;
 import static org.apache.dubbo.common.constants.RegistryConstants.DEFAULT_REGISTER_MODE_ALL;
 import static org.apache.dubbo.common.constants.RegistryConstants.DEFAULT_REGISTER_MODE_INSTANCE;
@@ -144,7 +147,7 @@ import static org.apache.dubbo.rpc.Constants.TOKEN_KEY;
 import static org.apache.dubbo.rpc.cluster.Constants.REFER_KEY;
 
 public class ConfigValidationUtils {
-    private static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(ConfigValidationUtils.class);
+    private static ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(ConfigValidationUtils.class);
     /**
      * The maximum length of a <b>parameter's value</b>
      */
@@ -489,6 +492,17 @@ public class ConfigValidationUtils {
         checkName(ARCHITECTURE, config.getArchitecture());
         checkName(ENVIRONMENT, config.getEnvironment());
         checkParameterName(config.getParameters());
+        checkQosDependency(config);
+    }
+
+    private static void checkQosDependency(ApplicationConfig config) {
+        if (!Boolean.FALSE.equals(config.getQosEnable())) {
+            try {
+                ClassUtils.forName("org.apache.dubbo.qos.protocol.QosProtocolWrapper");
+            } catch (ClassNotFoundException e) {
+                logger.warn(COMMON_CLASS_NOT_FOUND, "", "", "No QosProtocolWrapper class was found. Please check the dependency of dubbo-qos whether was imported correctly.", e);
+            }
+        }
     }
 
     public static void validateModuleConfig(ModuleConfig config) {
@@ -499,8 +513,21 @@ public class ConfigValidationUtils {
         }
     }
 
-    public static void validateMetadataConfig(MetadataReportConfig metadataReportConfig) {
+    public static boolean isValidMetadataConfig(MetadataReportConfig metadataReportConfig) {
         if (metadataReportConfig == null) {
+            return false;
+        }
+
+        if (Boolean.FALSE.equals(metadataReportConfig.getReportMetadata()) &&
+            Boolean.FALSE.equals(metadataReportConfig.getReportDefinition())) {
+            return false;
+        }
+
+        return !isEmpty(metadataReportConfig.getAddress());
+    }
+
+    public static void validateMetadataConfig(MetadataReportConfig metadataReportConfig) {
+        if (!isValidMetadataConfig(metadataReportConfig)) {
             return;
         }
 
@@ -514,6 +541,12 @@ public class ConfigValidationUtils {
 
     public static void validateMetricsConfig(MetricsConfig metricsConfig) {
         if (metricsConfig == null) {
+            return;
+        }
+    }
+
+    public static void validateTracingConfig(TracingConfig tracingConfig) {
+        if (tracingConfig == null) {
             return;
         }
     }
@@ -629,7 +662,7 @@ public class ConfigValidationUtils {
      * @param value    The Extension name
      */
     public static void checkMultiExtension(ScopeModel scopeModel, Class<?> type, String property, String value) {
-        checkMultiExtension(scopeModel,Collections.singletonList(type), property, value);
+        checkMultiExtension(scopeModel, Collections.singletonList(type), property, value);
     }
 
     public static void checkMultiExtension(ScopeModel scopeModel, List<Class<?>> types, String property, String value) {

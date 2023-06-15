@@ -18,7 +18,6 @@ package org.apache.dubbo.config;
 
 
 import org.apache.dubbo.common.constants.CommonConstants;
-
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -29,7 +28,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.Collections;
 
-public class AbstractInterfaceConfigTest {
+class AbstractInterfaceConfigTest {
 
     @BeforeAll
     public static void setUp(@TempDir Path folder) {
@@ -44,7 +43,7 @@ public class AbstractInterfaceConfigTest {
 
 
     @Test
-    public void checkStub1() {
+    void checkStub1() {
         Assertions.assertThrows(IllegalStateException.class, () -> {
             InterfaceConfig interfaceConfig = new InterfaceConfig();
             interfaceConfig.setLocal(GreetingLocal1.class.getName());
@@ -53,7 +52,7 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void checkStub2() {
+    void checkStub2() {
         Assertions.assertThrows(IllegalStateException.class, () -> {
             InterfaceConfig interfaceConfig = new InterfaceConfig();
             interfaceConfig.setLocal(GreetingLocal2.class.getName());
@@ -62,14 +61,14 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void checkStub3() {
+    void checkStub3() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setLocal(GreetingLocal3.class.getName());
         interfaceConfig.checkStubAndLocal(Greeting.class);
     }
 
     @Test
-    public void checkStub4() {
+    void checkStub4() {
         Assertions.assertThrows(IllegalStateException.class, () -> {
             InterfaceConfig interfaceConfig = new InterfaceConfig();
             interfaceConfig.setStub(GreetingLocal1.class.getName());
@@ -78,7 +77,7 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void checkStub5() {
+    void checkStub5() {
         Assertions.assertThrows(IllegalStateException.class, () -> {
             InterfaceConfig interfaceConfig = new InterfaceConfig();
             interfaceConfig.setStub(GreetingLocal2.class.getName());
@@ -87,14 +86,14 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void checkStub6() {
+    void checkStub6() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setStub(GreetingLocal3.class.getName());
         interfaceConfig.checkStubAndLocal(Greeting.class);
     }
 
     @Test
-    public void testLocal() {
+    void testLocal() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setLocal((Boolean) null);
         Assertions.assertNull(interfaceConfig.getLocal());
@@ -105,7 +104,7 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void testStub() {
+    void testStub() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setStub((Boolean) null);
         Assertions.assertNull(interfaceConfig.getStub());
@@ -116,49 +115,49 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void testCluster() {
+    void testCluster() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setCluster("mockcluster");
         Assertions.assertEquals("mockcluster", interfaceConfig.getCluster());
     }
 
     @Test
-    public void testProxy() {
+    void testProxy() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setProxy("mockproxyfactory");
         Assertions.assertEquals("mockproxyfactory", interfaceConfig.getProxy());
     }
 
     @Test
-    public void testConnections() {
+    void testConnections() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setConnections(1);
         Assertions.assertEquals(1, interfaceConfig.getConnections().intValue());
     }
 
     @Test
-    public void testFilter() {
+    void testFilter() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setFilter("mockfilter");
         Assertions.assertEquals("mockfilter", interfaceConfig.getFilter());
     }
 
     @Test
-    public void testListener() {
+    void testListener() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setListener("mockinvokerlistener");
         Assertions.assertEquals("mockinvokerlistener", interfaceConfig.getListener());
     }
 
     @Test
-    public void testLayer() {
+    void testLayer() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setLayer("layer");
         Assertions.assertEquals("layer", interfaceConfig.getLayer());
     }
 
     @Test
-    public void testApplication() {
+    void testApplication() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         ApplicationConfig applicationConfig = new ApplicationConfig("AbstractInterfaceConfigTest");
         interfaceConfig.setApplication(applicationConfig);
@@ -166,7 +165,7 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void testModule() {
+    void testModule() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         ModuleConfig moduleConfig = new ModuleConfig();
         interfaceConfig.setModule(moduleConfig);
@@ -174,7 +173,7 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void testRegistry() {
+    void testRegistry() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         RegistryConfig registryConfig = new RegistryConfig();
         interfaceConfig.setRegistry(registryConfig);
@@ -182,7 +181,7 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void testRegistries() {
+    void testRegistries() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         RegistryConfig registryConfig = new RegistryConfig();
         interfaceConfig.setRegistries(Collections.singletonList(registryConfig));
@@ -191,7 +190,7 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void testMonitor() {
+    void testMonitor() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setMonitor("monitor-addr");
         Assertions.assertEquals("monitor-addr", interfaceConfig.getMonitor().getAddress());
@@ -202,38 +201,59 @@ public class AbstractInterfaceConfigTest {
     }
 
     @Test
-    public void testOwner() {
+    void testOwner() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setOwner("owner");
         Assertions.assertEquals("owner", interfaceConfig.getOwner());
     }
 
     @Test
-    public void testCallbacks() {
+    void testCallbacks() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setCallbacks(2);
         Assertions.assertEquals(2, interfaceConfig.getCallbacks().intValue());
     }
 
     @Test
-    public void testOnconnect() {
+    void testOnconnect() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setOnconnect("onConnect");
         Assertions.assertEquals("onConnect", interfaceConfig.getOnconnect());
     }
 
     @Test
-    public void testOndisconnect() {
+    void testOndisconnect() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setOndisconnect("onDisconnect");
         Assertions.assertEquals("onDisconnect", interfaceConfig.getOndisconnect());
     }
 
     @Test
-    public void testScope() {
+    void testScope() {
         InterfaceConfig interfaceConfig = new InterfaceConfig();
         interfaceConfig.setScope("scope");
         Assertions.assertEquals("scope", interfaceConfig.getScope());
+    }
+
+    @Test
+    void testVerifyMethod() {
+        InterfaceConfig2 interfaceConfig2 = new InterfaceConfig2();
+        MethodConfig methodConfig = new MethodConfig();
+        methodConfig.setTimeout(5000);
+        methodConfig.setName("sayHello");
+        Class<?> clazz = Greeting.class;
+        boolean verifyResult = interfaceConfig2.verifyMethodConfig(methodConfig, clazz, false);
+        Assertions.assertTrue(verifyResult);
+
+        boolean verifyResult2 = interfaceConfig2.verifyMethodConfig(methodConfig, clazz, true);
+        Assertions.assertFalse(verifyResult2);
+    }
+
+    public static class InterfaceConfig2 extends AbstractInterfaceConfig {
+        @Override
+        protected boolean isNeedCheckMethod() {
+            return false;
+        }
     }
 
     public static class InterfaceConfig extends AbstractInterfaceConfig {

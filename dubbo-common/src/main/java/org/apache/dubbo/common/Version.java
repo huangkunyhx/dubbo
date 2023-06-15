@@ -16,13 +16,15 @@
  */
 package org.apache.dubbo.common;
 
-import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
-import org.apache.dubbo.common.utils.ClassUtils;
 import org.apache.dubbo.common.utils.StringUtils;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.CodeSource;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -32,11 +34,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.COMMON_UNEXPECTED_EXCEPTION;
+
 /**
  * Version
  */
 public final class Version {
-    private static final Logger logger = LoggerFactory.getLogger(Version.class);
+    private static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(Version.class);
 
     private static final Pattern PREFIX_DIGITS_PATTERN = Pattern.compile("^([0-9]*).*");
 
@@ -44,8 +48,9 @@ public final class Version {
     public static final String DEFAULT_DUBBO_PROTOCOL_VERSION = "2.0.2";
     // version 1.0.0 represents Dubbo rpc protocol before v2.6.2
     public static final int LEGACY_DUBBO_PROTOCOL_VERSION = 10000; // 1.0.0
-    // Dubbo implementation version, usually is jar version.
-    private static final String VERSION = getVersion(Version.class, "");
+    // Dubbo implementation version.
+    private static String VERSION;
+    private static String LATEST_COMMIT_ID;
 
     /**
      * For protocol compatibility purpose.
@@ -57,8 +62,36 @@ public final class Version {
     private static final Map<String, Integer> VERSION2INT = new HashMap<String, Integer>();
 
     static {
-        // check if there's duplicated jar
-        Version.checkDuplicate(Version.class);
+        // get dubbo version and last commit id
+        try {
+            tryLoadVersionFromResource();
+            checkDuplicate();
+        } catch (Throwable e) {
+            logger.warn(COMMON_UNEXPECTED_EXCEPTION, "", "", "continue the old logic, ignore exception " + e.getMessage(), e);
+        }
+        if (StringUtils.isEmpty(VERSION)) {
+            VERSION = getVersion(Version.class, "");
+        }
+        if (StringUtils.isEmpty(LATEST_COMMIT_ID)) {
+            LATEST_COMMIT_ID = "";
+        }
+    }
+
+    private static void tryLoadVersionFromResource() throws IOException {
+        Enumeration<URL> configLoader = Version.class.getClassLoader().getResources("META-INF/versions/dubbo-common");
+        if (configLoader.hasMoreElements()) {
+            URL url = configLoader.nextElement();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.startsWith("revision=")) {
+                        VERSION = line.substring("revision=".length());
+                    } else if (line.startsWith("git.commit.id=")) {
+                        LATEST_COMMIT_ID = line.substring("git.commit.id=".length());
+                    }
+                }
+            }
+        }
     }
 
     private Version() {
@@ -72,11 +105,16 @@ public final class Version {
         return VERSION;
     }
 
+    public static String getLastCommitId() {
+        return LATEST_COMMIT_ID;
+    }
+
     /**
      * Compare versions
+     *
      * @return the value {@code 0} if {@code version1 == version2};
-     *         a value less than {@code 0} if {@code version1 < version2}; and
-     *         a value greater than {@code 0} if {@code version1 > version2}
+     * a value less than {@code 0} if {@code version1 < version2}; and
+     * a value greater than {@code 0} if {@code version1 > version2}
      */
     public static int compare(String version1, String version2) {
         return Integer.compare(getIntVersion(version1), getIntVersion(version2));
@@ -131,9 +169,9 @@ public final class Version {
                     v = v * 100;
                 }
             } catch (Exception e) {
-                logger.warn("Please make sure your version value has the right format: " +
-                        "\n 1. only contains digital number: 2.0.0; \n 2. with string suffix: 2.6.7-stable. " +
-                        "\nIf you are using Dubbo before v2.6.2, the version value is the same with the jar version.");
+                logger.warn(COMMON_UNEXPECTED_EXCEPTION, "", "", "Please make sure your version value has the right format: " +
+                    "\n 1. only contains digital number: 2.0.0; \n 2. with string suffix: 2.6.7-stable. " +
+                    "\nIf you are using Dubbo before v2.6.2, the version value is the same with the jar version.");
                 v = LEGACY_DUBBO_PROTOCOL_VERSION;
             }
             VERSION2INT.put(version, v);
@@ -190,11 +228,11 @@ public final class Version {
             }
 
             URL location = codeSource.getLocation();
-            if (location == null){
+            if (location == null) {
                 logger.info("No location for class " + cls.getName() + " when getVersion, use default version " + defaultVersion);
                 return defaultVersion;
             }
-            String file =  location.getFile();
+            String file = location.getFile();
             if (!StringUtils.isEmpty(file) && file.endsWith(".jar")) {
                 version = getFromFile(file);
             }
@@ -203,7 +241,7 @@ public final class Version {
             return StringUtils.isEmpty(version) ? defaultVersion : version;
         } catch (Throwable e) {
             // return default version when any exception is thrown
-            logger.error("return default version, ignore exception " + e.getMessage(), e);
+            logger.error(COMMON_UNEXPECTED_EXCEPTION, "", "", "return default version, ignore exception " + e.getMessage(), e);
             return defaultVersion;
         }
     }
@@ -239,48 +277,75 @@ public final class Version {
         return file;
     }
 
-    public static void checkDuplicate(Class<?> cls, boolean failOnError) {
-        checkDuplicate(cls.getName().replace('.', '/') + ".class", failOnError);
-    }
-
-    public static void checkDuplicate(Class<?> cls) {
-        checkDuplicate(cls, false);
-    }
-
-    public static void checkDuplicate(String path, boolean failOnError) {
+    private static void checkDuplicate() {
         try {
-            // search in caller's classloader
-            Set<String> files = getResources(path);
-            // duplicated jar is found
-            if (files.size() > 1) {
-                String error = "Duplicate class " + path + " in " + files.size() + " jar " + files;
-                if (failOnError) {
-                    throw new IllegalStateException(error);
-                } else {
-                    logger.error(error);
-                }
-            }
+            checkArtifacts(loadArtifactIds());
         } catch (Throwable e) {
-            logger.error(e.getMessage(), e);
+            logger.error(COMMON_UNEXPECTED_EXCEPTION, "", "", e.getMessage(), e);
         }
     }
 
-    /**
-     * search resources in caller's classloader
-     */
-    private static Set<String> getResources(String path) throws IOException {
-        Enumeration<URL> urls = ClassUtils.getCallerClassLoader(Version.class).getResources(path);
-        Set<String> files = new HashSet<String>();
-        while (urls.hasMoreElements()) {
-            URL url = urls.nextElement();
-            if (url != null) {
-                String file = url.getFile();
-                if (StringUtils.isNotEmpty(file)) {
-                    files.add(file);
+    private static void checkArtifacts(Set<String> artifactIds) throws IOException {
+        if (!artifactIds.isEmpty()) {
+            for (String artifactId : artifactIds) {
+                checkArtifact(artifactId);
+            }
+        }
+    }
+
+    private static void checkArtifact(String artifactId) throws IOException {
+        Enumeration<URL> artifactEnumeration = Version.class.getClassLoader().getResources("META-INF/versions/" + artifactId);
+        while (artifactEnumeration.hasMoreElements()) {
+            URL url = artifactEnumeration.nextElement();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.startsWith("#")) {
+                        continue;
+                    }
+                    String[] artifactInfo = line.split("=");
+                    if (artifactInfo.length == 2) {
+                        String key = artifactInfo[0];
+                        String value = artifactInfo[1];
+                        checkVersion(artifactId, url, key, value);
+                    }
                 }
             }
         }
-        return files;
+    }
+
+    private static void checkVersion(String artifactId, URL url, String key, String value) {
+        if ("revision".equals(key) && !value.equals(VERSION)) {
+            String error = "Inconsistent version " + value + " found in " + artifactId + " from " + url.getPath() + ", " +
+                "expected dubbo-common version is " + VERSION;
+            logger.error(COMMON_UNEXPECTED_EXCEPTION, "", "", error);
+        }
+        if ("git.commit.id".equals(key) && !value.equals(LATEST_COMMIT_ID)) {
+            String error = "Inconsistent git build commit id " + value + " found in " + artifactId + " from " + url.getPath() + ", " +
+                "expected dubbo-common version is " + LATEST_COMMIT_ID;
+            logger.error(COMMON_UNEXPECTED_EXCEPTION, "", "", error);
+        }
+    }
+
+    private static Set<String> loadArtifactIds() throws IOException {
+        Enumeration<URL> artifactsEnumeration = Version.class.getClassLoader().getResources("META-INF/versions/.artifacts");
+        Set<String> artifactIds = new HashSet<>();
+        while (artifactsEnumeration.hasMoreElements()) {
+            URL url = artifactsEnumeration.nextElement();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.startsWith("#")) {
+                        continue;
+                    }
+                    if (StringUtils.isEmpty(line)) {
+                        continue;
+                    }
+                    artifactIds.add(line);
+                }
+            }
+        }
+        return artifactIds;
     }
 
 }

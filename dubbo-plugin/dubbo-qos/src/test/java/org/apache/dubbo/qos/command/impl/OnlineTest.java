@@ -20,7 +20,7 @@ import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.utils.ClassUtils;
 import org.apache.dubbo.qos.DemoService;
 import org.apache.dubbo.qos.DemoServiceImpl;
-import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.api.CommandContext;
 import org.apache.dubbo.registry.RegistryService;
 import org.apache.dubbo.rpc.model.FrameworkModel;
 import org.apache.dubbo.rpc.model.ModuleServiceRepository;
@@ -43,7 +43,7 @@ import static org.mockito.Mockito.mock;
  * {@link OnlineApp}
  * {@link OnlineInterface}
  */
-public class OnlineTest {
+class OnlineTest {
     private FrameworkModel frameworkModel;
     private ModuleServiceRepository repository;
     private ProviderModel.RegisterStatedURL registerStatedURL;
@@ -61,7 +61,7 @@ public class OnlineTest {
     }
 
     @Test
-    public void testExecute() {
+    void testExecute() {
         Online online = new Online(frameworkModel);
         String result = online.execute(mock(CommandContext.class), new String[]{DemoService.class.getName()});
         Assertions.assertEquals(result, "OK");

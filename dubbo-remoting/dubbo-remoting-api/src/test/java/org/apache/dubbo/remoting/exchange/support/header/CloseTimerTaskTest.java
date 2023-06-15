@@ -20,6 +20,7 @@ import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.timer.HashedWheelTimer;
 import org.apache.dubbo.remoting.Channel;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,7 @@ import static org.apache.dubbo.remoting.Constants.HEARTBEAT_CHECK_TICK;
 /**
  * {@link CloseTimerTask}
  */
-public class CloseTimerTaskTest {
+class CloseTimerTaskTest {
 
     private URL url = URL.valueOf("dubbo://localhost:20880");
 
@@ -54,11 +55,16 @@ public class CloseTimerTaskTest {
         };
 
         AbstractTimerTask.ChannelProvider cp = () -> Collections.<Channel>singletonList(channel);
-        closeTimerTask = new CloseTimerTask(cp, tickDuration / HEARTBEAT_CHECK_TICK, (int) tickDuration);
+        closeTimerTask = new CloseTimerTask(cp, closeTimer, tickDuration / HEARTBEAT_CHECK_TICK, (int) tickDuration);
+    }
+
+    @AfterEach
+    public void teardown() {
+        closeTimerTask.cancel();
     }
 
     @Test
-    public void testClose() throws Exception {
+    void testClose() throws Exception {
         long now = System.currentTimeMillis();
 
         url = url.addParameter(DUBBO_VERSION_KEY, "2.1.1");

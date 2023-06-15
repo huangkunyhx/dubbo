@@ -28,18 +28,19 @@ import org.junit.jupiter.api.Test;
 /**
  * {@link ModuleModel}
  */
-public class ModuleModelTest {
+class ModuleModelTest {
 
     @Test
-    public void testInitialize() {
+    void testInitialize() {
         FrameworkModel frameworkModel = new FrameworkModel();
-        ApplicationModel applicationModel = new ApplicationModel(frameworkModel);
-        ModuleModel moduleModel = new ModuleModel(applicationModel);
+        ApplicationModel applicationModel = frameworkModel.newApplication();
+        ModuleModel moduleModel = applicationModel.newModule();
         Assertions.assertEquals(moduleModel.getParent(), applicationModel);
         Assertions.assertEquals(moduleModel.getScope(), ExtensionScope.MODULE);
         Assertions.assertEquals(moduleModel.getApplicationModel(), applicationModel);
         Assertions.assertTrue(applicationModel.getPubModuleModels().contains(moduleModel));
         Assertions.assertNotNull(moduleModel.getInternalId());
+        Assertions.assertFalse(moduleModel.isLifeCycleManagedExternally());
 
         Assertions.assertNotNull(moduleModel.getExtensionDirector());
         Assertions.assertNotNull(moduleModel.getBeanFactory());
@@ -55,10 +56,10 @@ public class ModuleModelTest {
     }
 
     @Test
-    public void testModelEnvironment() {
+    void testModelEnvironment() {
         FrameworkModel frameworkModel = new FrameworkModel();
-        ApplicationModel applicationModel = new ApplicationModel(frameworkModel);
-        ModuleModel moduleModel = new ModuleModel(applicationModel);
+        ApplicationModel applicationModel = frameworkModel.newApplication();
+        ModuleModel moduleModel = applicationModel.newModule();
 
         ModuleEnvironment modelEnvironment = moduleModel.getModelEnvironment();
         Assertions.assertNotNull(modelEnvironment);
@@ -67,10 +68,10 @@ public class ModuleModelTest {
     }
 
     @Test
-    public void testDestroy() {
+    void testDestroy() {
         FrameworkModel frameworkModel = new FrameworkModel();
-        ApplicationModel applicationModel = new ApplicationModel(frameworkModel);
-        ModuleModel moduleModel = new ModuleModel(applicationModel);
+        ApplicationModel applicationModel = frameworkModel.newApplication();
+        ModuleModel moduleModel = applicationModel.newModule();
 
         MockScopeModelDestroyListener destroyListener = new MockScopeModelDestroyListener();
         moduleModel.addDestroyListener(destroyListener);

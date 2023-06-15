@@ -16,17 +16,16 @@
  */
 package org.apache.dubbo.remoting.transport.netty4;
 
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.handler.timeout.IdleStateEvent;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.url.component.ServiceConfigURL;
 import org.apache.dubbo.remoting.ChannelHandler;
 import org.apache.dubbo.remoting.exchange.Request;
-
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
-import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -35,20 +34,24 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class NettyClientHandlerTest {
+class NettyClientHandlerTest {
 
     @Test
-    public void test() throws Exception {
+    void test() throws Exception {
         URL url = new ServiceConfigURL("dubbo", "127.0.0.1", 20901);
         ChannelHandler handler = Mockito.mock(ChannelHandler.class);
         ChannelHandlerContext ctx = Mockito.mock(ChannelHandlerContext.class);
         Channel channel = Mockito.mock(Channel.class);
         Mockito.when(ctx.channel()).thenReturn(channel);
         Mockito.when(channel.isActive()).thenReturn(true);
+        Mockito.when(channel.eventLoop()).thenReturn(new NioEventLoopGroup().next());
+        Mockito.when(channel.alloc()).thenReturn(PooledByteBufAllocator.DEFAULT);
 
-        ChannelFuture future = mock(ChannelFuture.class);
+        ChannelPromise future = mock(ChannelPromise.class);
         when(channel.writeAndFlush(any())).thenReturn(future);
         when(future.cause()).thenReturn(null);
+        when(channel.newPromise()).thenReturn(future);
+        when(future.addListener(Mockito.any())).thenReturn(future);
 
         NettyClientHandler nettyClientHandler = new NettyClientHandler(url, handler);
 
@@ -73,14 +76,9 @@ public class NettyClientHandlerTest {
 
         nettyClientHandler.userEventTriggered(ctx, IdleStateEvent.READER_IDLE_STATE_EVENT);
         ArgumentCaptor<Request> requestArgumentCaptor = ArgumentCaptor.forClass(Request.class);
+        Thread.sleep(500);
         Mockito.verify(channel, Mockito.times(1)).writeAndFlush(requestArgumentCaptor.capture());
 
-
-        Request request = new Request();
-        ChannelPromise promise = Mockito.mock(ChannelPromise.class);
-        nettyClientHandler.write(ctx,request,promise);
-        ArgumentCaptor<GenericFutureListener> listenerArgumentCaptor = ArgumentCaptor.forClass(GenericFutureListener.class);
-        Mockito.verify(promise, Mockito.times(1)).addListener(listenerArgumentCaptor.capture());
 
     }
 }

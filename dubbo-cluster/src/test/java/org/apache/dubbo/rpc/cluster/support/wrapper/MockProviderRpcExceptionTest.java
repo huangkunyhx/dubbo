@@ -18,6 +18,7 @@ package org.apache.dubbo.rpc.cluster.support.wrapper;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.metrics.event.MetricsDispatcher;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.ProxyFactory;
@@ -28,6 +29,7 @@ import org.apache.dubbo.rpc.cluster.LoadBalance;
 import org.apache.dubbo.rpc.cluster.directory.StaticDirectory;
 import org.apache.dubbo.rpc.cluster.support.AbstractClusterInvoker;
 
+import org.apache.dubbo.rpc.model.ApplicationModel;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,12 +42,13 @@ import static org.apache.dubbo.common.constants.CommonConstants.PATH_KEY;
 import static org.apache.dubbo.rpc.Constants.MOCK_KEY;
 import static org.apache.dubbo.rpc.cluster.Constants.REFER_KEY;
 
-public class MockProviderRpcExceptionTest {
+class MockProviderRpcExceptionTest {
 
     List<Invoker<IHelloRpcService>> invokers = new ArrayList<Invoker<IHelloRpcService>>();
 
     @BeforeEach
     public void beforeMethod() {
+        ApplicationModel.defaultModel().getBeanFactory().registerBean(MetricsDispatcher.class);
         invokers.clear();
     }
 
@@ -53,7 +56,7 @@ public class MockProviderRpcExceptionTest {
      * Test if mock policy works fine: ProviderRpcException
      */
     @Test
-    public void testMockInvokerProviderRpcException() {
+    void testMockInvokerProviderRpcException() {
         URL url = URL.valueOf("remote://1.2.3.4/" + IHelloRpcService.class.getName());
         url = url.addParameter(MOCK_KEY, "true").addParameter("invoke_return_error", "true")
                 .addParameter(REFER_KEY,

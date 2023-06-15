@@ -27,6 +27,8 @@ import org.apache.dubbo.common.utils.CollectionUtils;
 import org.apache.dubbo.common.utils.ConcurrentHashSet;
 import org.apache.dubbo.metadata.MetadataInfo;
 import org.apache.dubbo.metadata.MetadataInfo.ServiceInfo;
+import org.apache.dubbo.metrics.event.MetricsEventBus;
+import org.apache.dubbo.metrics.registry.event.RegistryEvent;
 import org.apache.dubbo.registry.NotifyListener;
 import org.apache.dubbo.registry.client.DefaultServiceInstance;
 import org.apache.dubbo.registry.client.ServiceDiscovery;
@@ -55,11 +57,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.dubbo.common.constants.CommonConstants.PROTOCOL_KEY;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.INTERNAL_ERROR;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.REGISTRY_FAILED_REFRESH_ADDRESS;
+import static org.apache.dubbo.common.constants.RegistryConstants.DEFAULT_ENABLE_EMPTY_PROTECTION;
 import static org.apache.dubbo.common.constants.RegistryConstants.EMPTY_PROTOCOL;
 import static org.apache.dubbo.common.constants.RegistryConstants.ENABLE_EMPTY_PROTECTION_KEY;
 import static org.apache.dubbo.metadata.RevisionResolver.EMPTY_REVISION;
 import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.getExportedServicesRevision;
+
+;
 
 /**
  * TODO, refactor to move revision-metadata mapping to ServiceDiscovery. Instances should have already been mapped with metadata when reached here.
@@ -72,7 +78,6 @@ public class ServiceInstancesChangedListener {
 
     protected final Set<String> serviceNames;
     protected final ServiceDiscovery serviceDiscovery;
-    protected URL url;
     protected Map<String, Set<NotifyListenerWithKey>> listeners;
 
     protected AtomicBoolean destroyed = new AtomicBoolean(false);
@@ -86,6 +91,7 @@ public class ServiceInstancesChangedListener {
     private final ScheduledExecutorService scheduler;
     private volatile boolean hasEmptyMetadata;
     private final Set<ServiceInstanceNotificationCustomizer> serviceInstanceNotificationCustomizers;
+    private final ApplicationModel applicationModel;
 
 
     public ServiceInstancesChangedListener(Set<String> serviceNames, ServiceDiscovery serviceDiscovery) {
@@ -98,6 +104,7 @@ public class ServiceInstancesChangedListener {
         ApplicationModel applicationModel = ScopeModelUtil.getApplicationModel(serviceDiscovery == null || serviceDiscovery.getUrl() == null ? null : serviceDiscovery.getUrl().getScopeModel());
         this.scheduler = applicationModel.getBeanFactory().getBean(FrameworkExecutorRepository.class).getMetadataRetryExecutor();
         this.serviceInstanceNotificationCustomizers = applicationModel.getExtensionLoader(ServiceInstanceNotificationCustomizer.class).getSupportedExtensionInstances();
+        this.applicationModel = applicationModel;
     }
 
     /**
@@ -178,9 +185,9 @@ public class ServiceInstancesChangedListener {
                 try {
                     retryFuture = scheduler.schedule(new AddressRefreshRetryTask(retryPermission, event.getServiceName()), 10_000L, TimeUnit.MILLISECONDS);
                 } catch (Exception e) {
-                    logger.error("Error submitting async retry task.");
+                    logger.error(INTERNAL_ERROR, "unknown error in registry module", "", "Error submitting async retry task.");
                 }
-                logger.warn("Address refresh try task submitted");
+                logger.warn(INTERNAL_ERROR, "unknown error in registry module", "", "Address refresh try task submitted");
             }
 
             // return if all metadata is empty, this notification will not take effect.
@@ -267,14 +274,6 @@ public class ServiceInstancesChangedListener {
         return serviceNames;
     }
 
-    public void setUrl(URL url) {
-        this.url = url;
-    }
-
-    public URL getUrl() {
-        return url;
-    }
-
     public Map<String, List<ServiceInstance>> getAllInstances() {
         return allInstances;
     }
@@ -290,12 +289,12 @@ public class ServiceInstancesChangedListener {
     protected boolean isRetryAndExpired(ServiceInstancesChangedEvent event) {
         if (event instanceof RetryServiceInstancesChangedEvent) {
             RetryServiceInstancesChangedEvent retryEvent = (RetryServiceInstancesChangedEvent) event;
-            logger.warn("Received address refresh retry event, " + retryEvent.getFailureRecordTime());
+            logger.warn(INTERNAL_ERROR, "unknown error in registry module", "", "Received address refresh retry event, " + retryEvent.getFailureRecordTime());
             if (retryEvent.getFailureRecordTime() < lastRefreshTime && !hasEmptyMetadata) {
-                logger.warn("Ignore retry event, event time: " + retryEvent.getFailureRecordTime() + ", last refresh time: " + lastRefreshTime);
+                logger.warn(INTERNAL_ERROR, "unknown error in registry module", "", "Ignore retry event, event time: " + retryEvent.getFailureRecordTime() + ", last refresh time: " + lastRefreshTime);
                 return true;
             }
-            logger.warn("Retrying address notification...");
+            logger.warn(INTERNAL_ERROR, "unknown error in registry module", "", "Retrying address notification...");
         }
         return false;
     }
@@ -339,7 +338,7 @@ public class ServiceInstancesChangedListener {
 
         if (emptyMetadataNum > 0) {
             builder.insert(0, emptyMetadataNum + "/" + revisionToInstances.size() + " revisions failed to get metadata from remote: ");
-            logger.error(builder.toString());
+            logger.error(INTERNAL_ERROR, "unknown error in registry module", "", builder.toString());
         } else {
             builder.insert(0, revisionToInstances.size() + " unique working revisions: ");
             logger.info(builder.toString());
@@ -405,21 +404,30 @@ public class ServiceInstancesChangedListener {
      * race condition is protected by onEvent/doOnEvent
      */
     protected void notifyAddressChanged() {
-        // 1 different services
-        listeners.forEach((serviceKey, listenerSet) -> {
-            // 2 multiple subscription listener of the same service
-            for (NotifyListenerWithKey listenerWithKey : listenerSet) {
-                NotifyListener notifyListener = listenerWithKey.getNotifyListener();
 
-                List<URL> urls = toUrlsWithEmpty(getAddresses(listenerWithKey.getProtocolServiceKey(), notifyListener.getConsumerUrl()));
-                logger.info("Notify service " + listenerWithKey.getProtocolServiceKey() + " with urls " + urls.size());
-                notifyListener.notify(urls);
+        MetricsEventBus.post(RegistryEvent.toNotifyEvent(applicationModel),
+            () -> {
+                Map<String, Integer> lastNumMap = new HashMap<>();
+                // 1 different services
+                listeners.forEach((serviceKey, listenerSet) -> {
+                    // 2 multiple subscription listener of the same service
+                    for (NotifyListenerWithKey listenerWithKey : listenerSet) {
+                        NotifyListener notifyListener = listenerWithKey.getNotifyListener();
+
+                        List<URL> urls = toUrlsWithEmpty(getAddresses(listenerWithKey.getProtocolServiceKey(), notifyListener.getConsumerUrl()));
+                        logger.info("Notify service " + listenerWithKey.getProtocolServiceKey() + " with urls " + urls.size());
+                        notifyListener.notify(urls);
+                        lastNumMap.put(serviceKey, urls.size());
+                    }
+                });
+                return lastNumMap;
             }
-        });
+        );
+
     }
 
     protected List<URL> toUrlsWithEmpty(List<URL> urls) {
-        boolean emptyProtectionEnabled = serviceDiscovery.getUrl().getParameter(ENABLE_EMPTY_PROTECTION_KEY, true);
+        boolean emptyProtectionEnabled = serviceDiscovery.getUrl().getParameter(ENABLE_EMPTY_PROTECTION_KEY, DEFAULT_ENABLE_EMPTY_PROTECTION);
         if (!emptyProtectionEnabled && urls == null) {
             urls = new ArrayList<>();
         } else if (emptyProtectionEnabled && urls == null) {
@@ -428,7 +436,7 @@ public class ServiceInstancesChangedListener {
 
         if (CollectionUtils.isEmpty(urls) && !emptyProtectionEnabled) {
             // notice that the service of this.url may not be the same as notify listener.
-            URL empty = URLBuilder.from(this.url).setProtocol(EMPTY_PROTOCOL).build();
+            URL empty = URLBuilder.from(serviceDiscovery.getUrl()).setProtocol(EMPTY_PROTOCOL).build();
             urls.add(empty);
         }
         return urls;
@@ -465,12 +473,12 @@ public class ServiceInstancesChangedListener {
             return false;
         }
         ServiceInstancesChangedListener that = (ServiceInstancesChangedListener) o;
-        return Objects.equals(getServiceNames(), that.getServiceNames());
+        return Objects.equals(getServiceNames(), that.getServiceNames()) && Objects.equals(listeners, that.listeners);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getClass(), getServiceNames());
+        return Objects.hash(getClass(), getServiceNames(), listeners);
     }
 
     protected class AddressRefreshRetryTask implements Runnable {

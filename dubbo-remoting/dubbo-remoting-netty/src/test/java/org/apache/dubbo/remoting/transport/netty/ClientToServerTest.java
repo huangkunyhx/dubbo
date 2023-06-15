@@ -53,7 +53,7 @@ public abstract class ClientToServerTest  {
     }
 
     @BeforeEach
-    protected void tearDown() throws Exception {
+    protected void tearDown() {
         try {
             if (server != null)
                 server.close();
@@ -64,7 +64,7 @@ public abstract class ClientToServerTest  {
     }
 
     @Test
-    public void testFuture() throws Exception {
+    void testFuture() throws Exception {
         CompletableFuture<Object> future = client.request(new World("world"));
         Hello result = (Hello) future.get();
         Assertions.assertEquals("hello,world", result.getName());

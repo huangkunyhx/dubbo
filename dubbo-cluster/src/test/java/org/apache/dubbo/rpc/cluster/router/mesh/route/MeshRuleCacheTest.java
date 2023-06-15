@@ -34,12 +34,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class MeshRuleCacheTest {
+class MeshRuleCacheTest {
 
     private Invoker<Object> createInvoker(String app) {
         URL url = URL.valueOf("dubbo://localhost/DemoInterface?" + (StringUtils.isEmpty(app) ? "" : "remote.application=" + app));
@@ -49,9 +48,13 @@ public class MeshRuleCacheTest {
     }
 
     @Test
-    public void containMapKeyValue() {
+    void containMapKeyValue() {
         URL url = mock(URL.class);
-        when(url.getServiceKey()).thenReturn("test");
+        when(url.getOriginalServiceParameter("test", "key1")).thenReturn("value1");
+        when(url.getOriginalServiceParameter("test", "key2")).thenReturn("value2");
+        when(url.getOriginalServiceParameter("test", "key3")).thenReturn("value3");
+        when(url.getOriginalServiceParameter("test", "key4")).thenReturn("value4");
+
 
         Map<String, String> originMap = new HashMap<>();
 
@@ -64,20 +67,16 @@ public class MeshRuleCacheTest {
         inputMap.put("key1", "value1");
         inputMap.put("key2", "value2");
 
-        assertTrue(MeshRuleCache.containMapKeyValue(originMap, inputMap));
+        assertTrue(MeshRuleCache.isLabelMatch(url, "test", inputMap));
 
         inputMap.put("key4", "value4");
-        assertFalse(MeshRuleCache.containMapKeyValue(originMap, inputMap));
-
-
-        assertTrue(MeshRuleCache.containMapKeyValue(originMap, null));
-        assertTrue(MeshRuleCache.containMapKeyValue(originMap, new HashMap<>()));
+        assertTrue(MeshRuleCache.isLabelMatch(url, "test", inputMap));
 
     }
 
 
     @Test
-    public void testBuild() {
+    void testBuild() {
         BitList<Invoker<Object>> invokers = new BitList<>(Arrays.asList(createInvoker(""), createInvoker("unknown"), createInvoker("app1")));
 
         Subset subset = new Subset();

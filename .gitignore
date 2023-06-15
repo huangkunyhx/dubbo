@@ -1,7 +1,6 @@
 # maven ignore
 target/
 *.jar
-!.mvn/wrapper/*
 *.war
 *.zip
 *.tar
@@ -48,3 +47,6 @@ dubbo-demo/dubbo-demo-triple/build/*
 
 # global registry center
 .tmp
+
+.git.exec.error
+

@@ -32,7 +32,6 @@ public interface ObjectInput extends DataInput {
      * @throws IOException if an I/O error occurs
      * @throws ClassNotFoundException if an ClassNotFoundException occurs
      */
-    @Deprecated
     Object readObject() throws IOException, ClassNotFoundException;
 
     /**
@@ -79,8 +78,8 @@ public interface ObjectInput extends DataInput {
         return (Throwable) obj;
     }
 
-    default Object readEvent() throws IOException, ClassNotFoundException {
-        return readObject();
+    default String readEvent() throws IOException, ClassNotFoundException {
+        return readUTF();
     }
 
     default Map<String, Object> readAttachments() throws IOException, ClassNotFoundException {

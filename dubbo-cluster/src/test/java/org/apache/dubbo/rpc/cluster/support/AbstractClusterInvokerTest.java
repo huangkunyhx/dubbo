@@ -20,6 +20,7 @@ import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.ExtensionLoader;
 import org.apache.dubbo.common.utils.NetUtils;
 import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.metrics.event.MetricsDispatcher;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Result;
@@ -33,6 +34,7 @@ import org.apache.dubbo.rpc.cluster.filter.DemoService;
 import org.apache.dubbo.rpc.cluster.loadbalance.LeastActiveLoadBalance;
 import org.apache.dubbo.rpc.cluster.loadbalance.RandomLoadBalance;
 import org.apache.dubbo.rpc.cluster.loadbalance.RoundRobinLoadBalance;
+import org.apache.dubbo.rpc.model.ApplicationModel;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -44,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +72,7 @@ import static org.mockito.Mockito.when;
  * AbstractClusterInvokerTest
  */
 @SuppressWarnings("rawtypes")
-public class AbstractClusterInvokerTest {
+class AbstractClusterInvokerTest {
     List<Invoker<IHelloService>> invokers = new ArrayList<Invoker<IHelloService>>();
     List<Invoker<IHelloService>> selectedInvokers = new ArrayList<Invoker<IHelloService>>();
     AbstractClusterInvoker<IHelloService> cluster;
@@ -104,6 +107,7 @@ public class AbstractClusterInvokerTest {
     @SuppressWarnings({"unchecked"})
     @BeforeEach
     public void setUp() throws Exception {
+        ApplicationModel.defaultModel().getBeanFactory().registerBean(MetricsDispatcher.class);
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("application", "abstractClusterInvokerTest");
         url = url.putAttribute(REFER_KEY, attributes);
@@ -165,7 +169,7 @@ public class AbstractClusterInvokerTest {
 
     @Disabled("RpcContext attachments will be set to Invocation twice, first in ConsumerContextFilter, second AbstractInvoker")
     @Test
-    public void testBindingAttachment() {
+    void testBindingAttachment() {
         final String attachKey = "attach";
         final String attachValue = "value";
 
@@ -191,7 +195,7 @@ public class AbstractClusterInvokerTest {
     }
 
     @Test
-    public void testSelect_Invokersize0() throws Exception {
+    void testSelect_Invokersize0() {
         LoadBalance l = cluster.initLoadBalance(invokers, invocation);
         Assertions.assertNotNull(l,"cluster.initLoadBalance returns null!");
         {
@@ -207,7 +211,25 @@ public class AbstractClusterInvokerTest {
     }
 
     @Test
-    public void testSelect_Invokersize1() throws Exception {
+    void testSelectedInvokers() {
+        cluster = new AbstractClusterInvoker(dic) {
+            @Override
+            protected Result doInvoke(Invocation invocation, List invokers, LoadBalance loadbalance)
+                throws RpcException {
+                checkInvokers(invokers, invocation);
+                Invoker invoker = select(loadbalance, invocation, invokers, null);
+                return invokeWithContext(invoker, invocation);
+            }
+        };
+
+        // invoke
+        cluster.invoke(invocation);
+
+        Assertions.assertEquals(Collections.singletonList(invoker1), invocation.getInvokedInvokers());
+    }
+
+    @Test
+    void testSelect_Invokersize1() {
         invokers.clear();
         invokers.add(invoker1);
         LoadBalance l = cluster.initLoadBalance(invokers, invocation);
@@ -217,7 +239,7 @@ public class AbstractClusterInvokerTest {
     }
 
     @Test
-    public void testSelect_Invokersize2AndselectNotNull() throws Exception {
+    void testSelect_Invokersize2AndselectNotNull() {
         invokers.clear();
         invokers.add(invoker2);
         invokers.add(invoker4);
@@ -238,14 +260,14 @@ public class AbstractClusterInvokerTest {
     }
 
     @Test
-    public void testSelect_multiInvokers() throws Exception {
+    void testSelect_multiInvokers() {
         testSelect_multiInvokers(RoundRobinLoadBalance.NAME);
         testSelect_multiInvokers(LeastActiveLoadBalance.NAME);
         testSelect_multiInvokers(RandomLoadBalance.NAME);
     }
 
     @Test
-    public void testCloseAvailablecheck() {
+    void testCloseAvailablecheck() {
         LoadBalance lb = mock(LoadBalance.class);
         Map<String, String> queryMap = (Map<String, String> )url.getAttribute(REFER_KEY);
         URL tmpUrl = turnRegistryUrlToConsumerUrl(url, queryMap);
@@ -273,7 +295,7 @@ public class AbstractClusterInvokerTest {
     }
 
     @Test
-    public void testDonotSelectAgainAndNoCheckAvailable() {
+    void testDonotSelectAgainAndNoCheckAvailable() {
 
         LoadBalance lb = ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(RoundRobinLoadBalance.NAME);
         initlistsize5();
@@ -332,7 +354,7 @@ public class AbstractClusterInvokerTest {
     }
 
     @Test
-    public void testSelectAgainAndCheckAvailable() {
+    void testSelectAgainAndCheckAvailable() {
 
         LoadBalance lb = ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(RoundRobinLoadBalance.NAME);
         initlistsize5();
@@ -391,7 +413,7 @@ public class AbstractClusterInvokerTest {
     }
 
 
-    public void testSelect_multiInvokers(String lbname) throws Exception {
+    public void testSelect_multiInvokers(String lbname) {
 
         int min = 100, max = 500;
         Double d = (Math.random() * (max - min + 1) + min);
@@ -457,7 +479,7 @@ public class AbstractClusterInvokerTest {
      * Test balance.
      */
     @Test
-    public void testSelectBalance() {
+    void testSelectBalance() {
 
         LoadBalance lb = ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(RoundRobinLoadBalance.NAME);
         initlistsize5();
@@ -500,7 +522,7 @@ public class AbstractClusterInvokerTest {
     }
 
     @Test
-    public void testTimeoutExceptionCode() {
+    void testTimeoutExceptionCode() {
         List<Invoker<DemoService>> invokers = new ArrayList<Invoker<DemoService>>();
         invokers.add(new Invoker<DemoService>() {
 
@@ -529,22 +551,25 @@ public class AbstractClusterInvokerTest {
         });
         Directory<DemoService> directory = new StaticDirectory<DemoService>(invokers);
         FailoverClusterInvoker<DemoService> failoverClusterInvoker = new FailoverClusterInvoker<DemoService>(directory);
+        RpcInvocation invocation = new RpcInvocation("sayHello", DemoService.class.getName(), "", new Class<?>[0], new Object[0]);
         try {
-            failoverClusterInvoker.invoke(new RpcInvocation("sayHello", DemoService.class.getName(), "", new Class<?>[0], new Object[0]));
+            failoverClusterInvoker.invoke(invocation);
             Assertions.fail();
         } catch (RpcException e) {
             Assertions.assertEquals(RpcException.TIMEOUT_EXCEPTION, e.getCode());
         }
         ForkingClusterInvoker<DemoService> forkingClusterInvoker = new ForkingClusterInvoker<DemoService>(directory);
+        invocation = new RpcInvocation("sayHello", DemoService.class.getName(), "", new Class<?>[0], new Object[0]);
         try {
-            forkingClusterInvoker.invoke(new RpcInvocation("sayHello", DemoService.class.getName(), "", new Class<?>[0], new Object[0]));
+            forkingClusterInvoker.invoke(invocation);
             Assertions.fail();
         } catch (RpcException e) {
             Assertions.assertEquals(RpcException.TIMEOUT_EXCEPTION, e.getCode());
         }
         FailfastClusterInvoker<DemoService> failfastClusterInvoker = new FailfastClusterInvoker<DemoService>(directory);
+        invocation = new RpcInvocation("sayHello", DemoService.class.getName(), "", new Class<?>[0], new Object[0]);
         try {
-            failfastClusterInvoker.invoke(new RpcInvocation("sayHello", DemoService.class.getName(), "", new Class<?>[0], new Object[0]));
+            failfastClusterInvoker.invoke(invocation);
             Assertions.fail();
         } catch (RpcException e) {
             Assertions.assertEquals(RpcException.TIMEOUT_EXCEPTION, e.getCode());
@@ -555,7 +580,7 @@ public class AbstractClusterInvokerTest {
      * Test mock invoker selector works as expected
      */
     @Test
-    public void testMockedInvokerSelect() {
+    void testMockedInvokerSelect() {
         initlistsize5();
         invokers.add(mockedInvoker1);
 

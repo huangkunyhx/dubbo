@@ -17,14 +17,14 @@
 
 package org.apache.dubbo.configcenter.support.nacos;
 
+import com.alibaba.nacos.api.NacosFactory;
+import com.alibaba.nacos.api.config.ConfigService;
+import com.alibaba.nacos.api.exception.NacosException;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.config.configcenter.ConfigChangedEvent;
 import org.apache.dubbo.common.config.configcenter.ConfigurationListener;
 import org.apache.dubbo.common.config.configcenter.DynamicConfiguration;
-
-import com.alibaba.nacos.api.NacosFactory;
-import com.alibaba.nacos.api.config.ConfigService;
-import com.alibaba.nacos.api.exception.NacosException;
+import org.apache.dubbo.rpc.model.ApplicationModel;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 //FIXME: waiting for embedded Nacos suport, then we can open the switch.
 @Disabled("https://github.com/alibaba/nacos/issues/1188")
-public class NacosDynamicConfigurationTest {
+class NacosDynamicConfigurationTest {
     private static final String SESSION_TIMEOUT_KEY = "session";
 
     private static NacosDynamicConfiguration config;
@@ -55,7 +55,7 @@ public class NacosDynamicConfigurationTest {
     private static ConfigService nacosClient;
 
     @Test
-    public void testGetConfig() throws Exception {
+    void testGetConfig() throws Exception {
         put("org.apache.dubbo.nacos.testService.configurators", "hello");
         Thread.sleep(200);
         put("dubbo.properties", "test", "aaa=bbb");
@@ -68,7 +68,7 @@ public class NacosDynamicConfigurationTest {
     }
 
     @Test
-    public void testAddListener() throws Exception {
+    void testAddListener() throws Exception {
         CountDownLatch latch = new CountDownLatch(4);
         TestListener listener1 = new TestListener(latch);
         TestListener listener2 = new TestListener(latch);
@@ -132,7 +132,7 @@ public class NacosDynamicConfigurationTest {
         // timeout in 15 seconds.
         URL url = URL.valueOf(urlForDubbo)
                 .addParameter(SESSION_TIMEOUT_KEY, 15000);
-        config = new NacosDynamicConfiguration(url);
+        config = new NacosDynamicConfiguration(url, ApplicationModel.defaultModel());
 
 
         try {
@@ -143,7 +143,7 @@ public class NacosDynamicConfigurationTest {
     }
 
     @Test
-    public void testPublishConfig() {
+    void testPublishConfig() {
         String key = "user-service";
         String group = "org.apache.dubbo.service.UserService";
         String content = "test";

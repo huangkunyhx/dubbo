@@ -19,16 +19,17 @@ package org.apache.dubbo.remoting.exchange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class RequestTest {
+class RequestTest {
 
     @Test
-    public void test() {
+    void test() {
         Request request = new Request();
         request.setTwoWay(true);
         request.setBroken(true);
         request.setVersion("1.0.0");
         request.setEvent(true);
         request.setData("data");
+        request.setPayload(1024);
 
         Assertions.assertTrue(request.isTwoWay());
         Assertions.assertTrue(request.isBroken());
@@ -36,6 +37,7 @@ public class RequestTest {
         Assertions.assertEquals(request.getVersion(), "1.0.0");
         Assertions.assertEquals(request.getData(), "data");
         Assertions.assertTrue(request.getId() >= 0);
+        Assertions.assertEquals(1024, request.getPayload());
 
         request.setHeartbeat(true);
         Assertions.assertTrue(request.isHeartbeat());

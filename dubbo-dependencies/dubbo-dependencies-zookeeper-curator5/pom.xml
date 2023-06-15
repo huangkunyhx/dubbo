@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
-        <version>21</version>
+        <version>27</version>
         <relativePath />
     </parent>
 
@@ -32,10 +32,10 @@
     <packaging>pom</packaging>
 
     <properties>
-        <revision>3.1.1.1</revision>
-        <maven_flatten_version>1.1.0</maven_flatten_version>
-        <curator_version>5.1.0</curator_version>
-        <zookeeper_version>3.7.0</zookeeper_version>
+        <revision>3.2.3.1</revision>
+        <maven_flatten_version>1.5.0</maven_flatten_version>
+        <curator5_version>5.1.0</curator5_version>
+        <zookeeper_version>3.8.1</zookeeper_version>
     </properties>
 
     <dependencyManagement>
@@ -54,7 +54,7 @@
         <dependency>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-x-discovery</artifactId>
-            <version>${curator_version}</version>
+            <version>${curator5_version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.zookeeper</groupId>
@@ -149,22 +149,23 @@
             <id>release</id>
             <build>
                 <plugins>
-<!--                    <plugin>-->
-<!--                        <groupId>org.apache.maven.plugins</groupId>-->
-<!--                        <artifactId>maven-gpg-plugin</artifactId>-->
-<!--                        <executions>-->
-<!--                            <execution>-->
-<!--                                <phase>verify</phase>-->
-<!--                                <goals>-->
-<!--                                    <goal>sign</goal>-->
-<!--                                </goals>-->
-<!--                            </execution>-->
-<!--                        </executions>-->
-<!--                    </plugin>-->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
                 </plugins>
             </build>
         </profile>
     </profiles>
+
     <distributionManagement>
         <repository>
             <id>maven-releases</id>

@@ -18,6 +18,7 @@ package org.apache.dubbo.rpc.cluster.router.file;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.ExtensionLoader;
+import org.apache.dubbo.metrics.event.MetricsDispatcher;
 import org.apache.dubbo.rpc.AppResponse;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
@@ -30,6 +31,7 @@ import org.apache.dubbo.rpc.cluster.LoadBalance;
 import org.apache.dubbo.rpc.cluster.directory.StaticDirectory;
 import org.apache.dubbo.rpc.cluster.router.state.StateRouterFactory;
 import org.apache.dubbo.rpc.cluster.support.AbstractClusterInvoker;
+import org.apache.dubbo.rpc.model.ApplicationModel;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -47,7 +49,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
 @SuppressWarnings("unchecked")
-public class FileRouterEngineTest {
+class FileRouterEngineTest {
     private static boolean isScriptUnsupported = new ScriptEngineManager().getEngineByName("javascript") == null;
     List<Invoker<FileRouterEngineTest>> invokers = new ArrayList<Invoker<FileRouterEngineTest>>();
     Invoker<FileRouterEngineTest> invoker1 = mock(Invoker.class);
@@ -59,6 +61,7 @@ public class FileRouterEngineTest {
 
     @BeforeAll
     public static void setUpBeforeClass() throws Exception {
+        ApplicationModel.defaultModel().getBeanFactory().registerBean(MetricsDispatcher.class);
         System.setProperty(ENABLE_CONNECTIVITY_VALIDATION, "false");
     }
 
@@ -75,7 +78,7 @@ public class FileRouterEngineTest {
     }
 
     @Test
-    public void testRouteNotAvailable() {
+    void testRouteNotAvailable() {
         if (isScriptUnsupported) return;
         URL url = initUrl("notAvailablerule.javascript");
         initInvocation("method1");
@@ -92,7 +95,7 @@ public class FileRouterEngineTest {
     }
 
     @Test
-    public void testRouteAvailable() {
+    void testRouteAvailable() {
         if (isScriptUnsupported) return;
         URL url = initUrl("availablerule.javascript");
         initInvocation("method1");
@@ -109,7 +112,7 @@ public class FileRouterEngineTest {
     }
 
     @Test
-    public void testRouteByMethodName() {
+    void testRouteByMethodName() {
         if (isScriptUnsupported) return;
         URL url = initUrl("methodrule.javascript");
         {
@@ -172,7 +175,7 @@ public class FileRouterEngineTest {
         URL dicInitUrl = URL.valueOf("consumer://localhost:20880/org.apache.dubbo.rpc.cluster.router.file.FileRouterEngineTest?application=FileRouterEngineTest");
         dic = new StaticDirectory<>(dicInitUrl, invokers);
         dic.buildRouterChain();
-        dic.getRouterChain().setHeadStateRouter(routerFactory.getRouter(FileRouterEngineTest.class, url));
+        dic.getRouterChain().getCurrentChain().setHeadStateRouter(routerFactory.getRouter(FileRouterEngineTest.class, url));
     }
 
     static class MockClusterInvoker<T> extends AbstractClusterInvoker<T> {

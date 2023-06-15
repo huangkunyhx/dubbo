@@ -17,7 +17,7 @@
 
 package org.apache.dubbo.rpc.protocol.tri.call;
 
-import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.rpc.CancellationContext;
 import org.apache.dubbo.rpc.Invoker;
@@ -30,9 +30,12 @@ import org.apache.dubbo.rpc.protocol.tri.observer.ServerCallToObserverAdapter;
 
 import java.net.InetSocketAddress;
 
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.PROTOCOL_TIMEOUT_SERVER;
+import static org.apache.dubbo.common.constants.CommonConstants.REMOTE_APPLICATION_KEY;
+
 public abstract class AbstractServerCallListener implements AbstractServerCall.Listener {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractServerCallListener.class);
+    private static final ErrorTypeAwareLogger LOGGER = LoggerFactory.getErrorTypeAwareLogger(AbstractServerCallListener.class);
     public final CancellationContext cancellationContext;
     final RpcInvocation invocation;
     final Invoker<?> invoker;
@@ -50,11 +53,12 @@ public abstract class AbstractServerCallListener implements AbstractServerCall.L
         RpcContext.restoreCancellationContext(cancellationContext);
         InetSocketAddress remoteAddress = (InetSocketAddress) invocation.getAttributes()
             .remove(AbstractServerCall.REMOTE_ADDRESS_KEY);
-        RpcContext.getServerContext().setRemoteAddress(remoteAddress);
+        RpcContext.getServiceContext().setRemoteAddress(remoteAddress);
         String remoteApp = (String) invocation.getAttributes()
             .remove(TripleHeaderEnum.CONSUMER_APP_NAME_KEY);
         if (null != remoteApp) {
-            RpcContext.getServerContext().setRemoteApplicationName(remoteApp);
+            RpcContext.getServiceContext().setRemoteApplicationName(remoteApp);
+            invocation.setAttachmentIfAbsent(REMOTE_APPLICATION_KEY, remoteApp);
         }
         final long stInMillis = System.currentTimeMillis();
         try {
@@ -66,12 +70,12 @@ public abstract class AbstractServerCallListener implements AbstractServerCall.L
                     return;
                 }
                 if (response.hasException()) {
-                    responseObserver.onError(response.getException());
+                    doOnResponseHasException(response.getException());
                     return;
                 }
                 final long cost = System.currentTimeMillis() - stInMillis;
                 if (responseObserver.isTimeout(cost)) {
-                    LOGGER.error(String.format(
+                    LOGGER.error(PROTOCOL_TIMEOUT_SERVER, "", "", String.format(
                         "Invoke timeout at server side, ignored to send response. service=%s method=%s cost=%s",
                         invocation.getTargetServiceUniqueName(),
                         invocation.getMethodName(),
@@ -81,12 +85,17 @@ public abstract class AbstractServerCallListener implements AbstractServerCall.L
                 }
                 onReturn(r.getValue());
             });
-        } catch (Throwable t) {
-            responseObserver.onError(t);
+        } catch (Exception e) {
+            responseObserver.onError(e);
         } finally {
             RpcContext.removeCancellationContext();
             RpcContext.removeContext();
         }
+    }
+
+
+    protected void doOnResponseHasException(Throwable t) {
+        responseObserver.onError(t);
     }
 
     public abstract void onReturn(Object value);

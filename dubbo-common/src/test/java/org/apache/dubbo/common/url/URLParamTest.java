@@ -28,9 +28,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class URLParamTest {
+class URLParamTest {
     @Test
-    public void testParseWithRawParam() {
+    void testParseWithRawParam() {
         URLParam urlParam1 = URLParam.parse("aaa=aaa&bbb&version=1.0&default.ccc=123");
         Assertions.assertEquals("aaa", urlParam1.getParameter("aaa"));
         Assertions.assertEquals("bbb", urlParam1.getParameter("bbb"));
@@ -55,7 +55,7 @@ public class URLParamTest {
     }
 
     @Test
-    public void testParseWithMap() {
+    void testParseWithMap() {
         Map<String, String> map = new HashMap<>();
         map.put("aaa", "aaa");
         map.put("bbb", "bbb");
@@ -82,7 +82,34 @@ public class URLParamTest {
     }
 
     @Test
-    public void testGetParameter() {
+    void testDefault() {
+        Map<String, String> map = new HashMap<>();
+        map.put("aaa", "aaa");
+        map.put("bbb", "bbb");
+        map.put("version", "2.0");
+        map.put("timeout", "1234");
+        map.put("default.timeout", "5678");
+
+        URLParam urlParam1 = URLParam.parse(map);
+        Assertions.assertEquals("1234", urlParam1.getParameter("timeout"));
+        Assertions.assertEquals("5678", urlParam1.getParameter("default.timeout"));
+
+        map.remove("timeout");
+        URLParam urlParam2 = URLParam.parse(map);
+        Assertions.assertEquals("5678", urlParam2.getParameter("timeout"));
+        Assertions.assertEquals("5678", urlParam2.getParameter("default.timeout"));
+
+        URLParam urlParam3 = URLParam.parse("timeout=1234&default.timeout=5678");
+        Assertions.assertEquals("1234", urlParam3.getParameter("timeout"));
+        Assertions.assertEquals("5678", urlParam3.getParameter("default.timeout"));
+
+        URLParam urlParam4 = URLParam.parse("default.timeout=5678");
+        Assertions.assertEquals("5678", urlParam4.getParameter("timeout"));
+        Assertions.assertEquals("5678", urlParam4.getParameter("default.timeout"));
+    }
+
+    @Test
+    void testGetParameter() {
         URLParam urlParam1 = URLParam.parse("aaa=aaa&bbb&version=1.0&default.ccc=123");
         Assertions.assertNull(urlParam1.getParameter("abcde"));
 
@@ -98,7 +125,7 @@ public class URLParamTest {
     }
 
     @Test
-    public void testHasParameter() {
+    void testHasParameter() {
         URLParam urlParam1 = URLParam.parse("aaa=aaa&side=provider");
         Assertions.assertTrue(urlParam1.hasParameter("aaa"));
         Assertions.assertFalse(urlParam1.hasParameter("bbb"));
@@ -107,7 +134,7 @@ public class URLParamTest {
     }
 
     @Test
-    public void testRemoveParameters() {
+    void testRemoveParameters() {
         URLParam urlParam1 = URLParam.parse("aaa=aaa&side=provider&version=1.0");
         Assertions.assertTrue(urlParam1.hasParameter("aaa"));
         Assertions.assertTrue(urlParam1.hasParameter("side"));
@@ -138,7 +165,7 @@ public class URLParamTest {
     }
 
     @Test
-    public void testAddParameters() {
+    void testAddParameters() {
         URLParam urlParam1 = URLParam.parse("aaa=aaa&side=provider");
         Assertions.assertTrue(urlParam1.hasParameter("aaa"));
         Assertions.assertTrue(urlParam1.hasParameter("side"));
@@ -186,13 +213,14 @@ public class URLParamTest {
     }
 
     @Test
-    public void testURLParamMap() {
+    void testURLParamMap() {
         URLParam urlParam1 = URLParam.parse("");
         Assertions.assertTrue(urlParam1.getParameters().isEmpty());
         Assertions.assertEquals(0, urlParam1.getParameters().size());
         Assertions.assertFalse(urlParam1.getParameters().containsKey("aaa"));
         Assertions.assertFalse(urlParam1.getParameters().containsKey("version"));
         Assertions.assertFalse(urlParam1.getParameters().containsKey(new Object()));
+        Assertions.assertEquals(new HashMap<>(urlParam1.getParameters()).toString(), urlParam1.getParameters().toString());
 
         URLParam urlParam2 = URLParam.parse("aaa=aaa&version=1.0");
         URLParam.URLParamMap urlParam2Map = (URLParam.URLParamMap) urlParam2.getParameters();
@@ -257,10 +285,14 @@ public class URLParamTest {
 
         set.add(urlParam4.getParameters());
         Assertions.assertEquals(2,set.size());
+
+        URLParam urlParam5 = URLParam.parse("version=1.0");
+        Assertions.assertEquals(new HashMap<>(urlParam5.getParameters()).toString(), urlParam5.getParameters().toString());
+
     }
 
     @Test
-    public void testMethodParameters() {
+    void testMethodParameters() {
         URLParam urlParam1 = URLParam.parse("aaa.method1=aaa&bbb.method2=bbb");
         Assertions.assertEquals("aaa",urlParam1.getAnyMethodParameter("method1"));
         Assertions.assertEquals("bbb",urlParam1.getAnyMethodParameter("method2"));

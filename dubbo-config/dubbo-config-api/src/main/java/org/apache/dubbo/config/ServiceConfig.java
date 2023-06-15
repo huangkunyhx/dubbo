@@ -19,11 +19,13 @@ package org.apache.dubbo.config;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.URLBuilder;
 import org.apache.dubbo.common.Version;
+import org.apache.dubbo.common.config.ConfigurationUtils;
 import org.apache.dubbo.common.constants.CommonConstants;
 import org.apache.dubbo.common.extension.ExtensionLoader;
 import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.threadpool.manager.ExecutorRepository;
+import org.apache.dubbo.common.threadpool.manager.FrameworkExecutorRepository;
 import org.apache.dubbo.common.url.component.ServiceConfigURL;
 import org.apache.dubbo.common.utils.ClassUtils;
 import org.apache.dubbo.common.utils.CollectionUtils;
@@ -35,6 +37,8 @@ import org.apache.dubbo.config.invoker.DelegateProviderMetaDataInvoker;
 import org.apache.dubbo.config.support.Parameter;
 import org.apache.dubbo.config.utils.ConfigValidationUtils;
 import org.apache.dubbo.metadata.ServiceNameMapping;
+import org.apache.dubbo.metrics.event.MetricsEventBus;
+import org.apache.dubbo.metrics.registry.event.RegistryEvent;
 import org.apache.dubbo.registry.client.metadata.MetadataUtils;
 import org.apache.dubbo.rpc.Exporter;
 import org.apache.dubbo.rpc.Invoker;
@@ -49,33 +53,41 @@ import org.apache.dubbo.rpc.model.ScopeModel;
 import org.apache.dubbo.rpc.model.ServiceDescriptor;
 import org.apache.dubbo.rpc.service.GenericService;
 
+import java.beans.Transient;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.dubbo.common.constants.CommonConstants.ANYHOST_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.ANY_VALUE;
+import static org.apache.dubbo.common.constants.CommonConstants.COMMA_SEPARATOR;
 import static org.apache.dubbo.common.constants.CommonConstants.DUBBO;
 import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_IP_TO_BIND;
+import static org.apache.dubbo.common.constants.CommonConstants.EXECUTOR_MANAGEMENT_MODE_ISOLATION;
+import static org.apache.dubbo.common.constants.CommonConstants.EXPORTER_LISTENER_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.LOCALHOST_VALUE;
 import static org.apache.dubbo.common.constants.CommonConstants.METHODS_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.MONITOR_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.PROVIDER_SIDE;
 import static org.apache.dubbo.common.constants.CommonConstants.REVISION_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.SERVICE_EXECUTOR;
 import static org.apache.dubbo.common.constants.CommonConstants.SERVICE_NAME_MAPPING_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.SIDE_KEY;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.COMMON_ISOLATED_EXECUTOR_CONFIGURATION_ERROR;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_FAILED_EXPORT_SERVICE;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_NO_METHOD_FOUND;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_SERVER_DISCONNECTED;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_UNEXPORT_ERROR;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_USE_RANDOM_PORT;
-import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_FAILED_EXPORT_SERVICE;
-import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_SERVER_DISCONNECTED;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.INTERNAL_ERROR;
 import static org.apache.dubbo.common.constants.RegistryConstants.DYNAMIC_KEY;
 import static org.apache.dubbo.common.constants.RegistryConstants.SERVICE_REGISTRY_PROTOCOL;
 import static org.apache.dubbo.common.utils.NetUtils.getAvailablePort;
@@ -186,6 +198,14 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         if (!exporters.isEmpty()) {
             for (Exporter<?> exporter : exporters) {
                 try {
+                    exporter.unregister();
+                } catch (Throwable t) {
+                    logger.warn(CONFIG_UNEXPORT_ERROR, "", "", "Unexpected error occurred when unexport " + exporter, t);
+                }
+            }
+            waitForIdle();
+            for (Exporter<?> exporter : exporters) {
+                try {
                     exporter.unexport();
                 } catch (Throwable t) {
                     logger.warn(CONFIG_UNEXPORT_ERROR, "", "", "Unexpected error occurred when unexport " + exporter, t);
@@ -197,6 +217,51 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         onUnexpoted();
         ModuleServiceRepository repository = getScopeModel().getServiceRepository();
         repository.unregisterProvider(providerModel);
+    }
+
+    private void waitForIdle() {
+        int timeout = ConfigurationUtils.getServerShutdownTimeout(getScopeModel());
+
+        long idleTime = System.currentTimeMillis() - providerModel.getLastInvokeTime();
+
+        // 1. if service has idle for 10s(shutdown time), un-export directly
+        if (idleTime > timeout) {
+            return;
+        }
+
+        // 2. if service has idle for  more than 6.7s(2/3 of shutdown time), wait for the rest time, then un-export directly
+        int tick = timeout / 3;
+        if (timeout - idleTime < tick) {
+            logger.info("Service " + getUniqueServiceName() + " has idle for " + idleTime + " ms, wait for " + (timeout - idleTime) + " ms to un-export");
+            try {
+                Thread.sleep(timeout - idleTime);
+            } catch (InterruptedException e) {
+                logger.warn(INTERNAL_ERROR, "unknown error in registry module", "", e.getMessage(), e);
+                Thread.currentThread().interrupt();
+            }
+            return;
+        }
+
+        // 3. Wait for 3.33s(1/3 of shutdown time), if service has idle for 3.33s(1/3 of shutdown time), un-export directly,
+        //    otherwise wait for the rest time until idle for 3.33s(1/3 of shutdown time). The max wait time is 10s(shutdown time).
+        idleTime = 0;
+        long startTime = System.currentTimeMillis();
+        while (idleTime < tick) {
+            // service idle time.
+            idleTime = System.currentTimeMillis() - Math.max(providerModel.getLastInvokeTime(), startTime);
+            if (idleTime >= tick || System.currentTimeMillis() - startTime > timeout) {
+                return;
+            }
+            // idle rest time or timeout rest time
+            long waitTime = Math.min(tick - idleTime, timeout + startTime - System.currentTimeMillis());
+            logger.info("Service " + getUniqueServiceName() + " has idle for " + idleTime + " ms, wait for " + waitTime + " ms to un-export");
+            try {
+                Thread.sleep(waitTime);
+            } catch (InterruptedException e) {
+                logger.warn(INTERNAL_ERROR, "unknown error in registry module", "", e.getMessage(), e);
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     /**
@@ -215,7 +280,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
     }
 
     @Override
-    public void export() {
+    public void export(boolean register) {
         if (this.exported) {
             return;
         }
@@ -235,19 +300,37 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                 this.init();
 
                 if (shouldDelay()) {
-                    doDelayExport();
+                    // should register if delay export
+                    doDelayExport(true);
                 } else {
-                    doExport();
+                    doExport(register);
                 }
             }
         }
     }
 
-    protected void doDelayExport() {
-        getScopeModel().getDefaultExtension(ExecutorRepository.class).getServiceExportExecutor()
+    @Override
+    public void register() {
+        if (!this.exported) {
+            return;
+        }
+
+        synchronized (this) {
+            if (!this.exported) {
+                return;
+            }
+
+            for (Exporter<?> exporter : exporters) {
+                exporter.register();
+            }
+        }
+    }
+
+    protected void doDelayExport(boolean register) {
+        ExecutorRepository.getInstance(getScopeModel().getApplicationModel()).getServiceExportExecutor()
             .schedule(() -> {
                 try {
-                    doExport();
+                    doExport(register);
                 } catch (Exception e) {
                     logger.error(CONFIG_FAILED_EXPORT_SERVICE, "configuration server disconnected", "", "Failed to (async)export service config: " + interfaceName, e);
                 }
@@ -260,19 +343,39 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         exportedURLs.forEach(url -> {
             if (url.getParameters().containsKey(SERVICE_NAME_MAPPING_KEY)) {
                 ServiceNameMapping serviceNameMapping = ServiceNameMapping.getDefaultExtension(getScopeModel());
-                try {
-                    boolean succeeded = serviceNameMapping.map(url);
-                    if (succeeded) {
-                        logger.info("Successfully registered interface application mapping for service " + url.getServiceKey());
-                    } else {
-                        logger.error(CONFIG_SERVER_DISCONNECTED, "configuration server disconnected", "", "Failed register interface application mapping for service " + url.getServiceKey());
-                    }
-                } catch (Exception e) {
-                    logger.error(CONFIG_SERVER_DISCONNECTED, "configuration server disconnected", "", "Failed register interface application mapping for service " + url.getServiceKey(), e);
-                }
+                ScheduledExecutorService scheduledExecutor = getScopeModel().getBeanFactory()
+                    .getBean(FrameworkExecutorRepository.class).getSharedScheduledExecutor();
+                mapServiceName(url, serviceNameMapping, scheduledExecutor);
             }
         });
         onExported();
+    }
+
+    protected void mapServiceName(URL url, ServiceNameMapping serviceNameMapping, ScheduledExecutorService scheduledExecutor) {
+        if (!exported) {
+            return;
+        }
+        logger.info("Try to register interface application mapping for service " + url.getServiceKey());
+        boolean succeeded = false;
+        try {
+            succeeded = serviceNameMapping.map(url);
+            if (succeeded) {
+                logger.info("Successfully registered interface application mapping for service " + url.getServiceKey());
+            } else {
+                logger.error(CONFIG_SERVER_DISCONNECTED, "configuration server disconnected", "", "Failed register interface application mapping for service " + url.getServiceKey());
+            }
+        } catch (Exception e) {
+            logger.error(CONFIG_SERVER_DISCONNECTED, "configuration server disconnected", "", "Failed register interface application mapping for service " + url.getServiceKey(), e);
+        }
+        if (!succeeded && serviceNameMapping.hasValidMetadataCenter()) {
+            scheduleToMapping(scheduledExecutor, serviceNameMapping, url);
+        }
+    }
+
+    private void scheduleToMapping(ScheduledExecutorService scheduledExecutor, ServiceNameMapping serviceNameMapping, URL url) {
+        Integer mappingRetryInterval = getApplication().getMappingRetryInterval();
+        scheduledExecutor.schedule(() -> mapServiceName(url, serviceNameMapping, scheduledExecutor),
+            mappingRetryInterval == null ? 5000 : mappingRetryInterval, TimeUnit.MILLISECONDS);
     }
 
     private void checkAndUpdateSubConfigs() {
@@ -354,7 +457,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         checkAndUpdateSubConfigs();
     }
 
-    protected synchronized void doExport() {
+    protected synchronized void doExport(boolean register) {
         if (unexported) {
             throw new IllegalStateException("The service " + interfaceClass.getName() + " has already unexported!");
         }
@@ -365,12 +468,12 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         if (StringUtils.isEmpty(path)) {
             path = interfaceName;
         }
-        doExportUrls();
+        doExportUrls(register);
         exported();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void doExportUrls() {
+    private void doExportUrls(boolean register) {
         ModuleServiceRepository repository = getScopeModel().getServiceRepository();
         ServiceDescriptor serviceDescriptor;
         final boolean serverService = ref instanceof ServerService;
@@ -394,22 +497,27 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
 
         List<URL> registryURLs = ConfigValidationUtils.loadRegistries(this, true);
 
-        for (ProtocolConfig protocolConfig : protocols) {
-            String pathKey = URL.buildKey(getContextPath(protocolConfig)
-                .map(p -> p + "/" + path)
-                .orElse(path), group, version);
-            // stub service will use generated service name
-            if (!serverService) {
-                // In case user specified path, register service one more time to map it to path.
-                repository.registerService(pathKey, interfaceClass);
+        MetricsEventBus.post(RegistryEvent.toRsEvent(module.getApplicationModel(), getUniqueServiceName(), protocols.size() * registryURLs.size()),
+            () -> {
+                for (ProtocolConfig protocolConfig : protocols) {
+                    String pathKey = URL.buildKey(getContextPath(protocolConfig)
+                        .map(p -> p + "/" + path)
+                        .orElse(path), group, version);
+                    // stub service will use generated service name
+                    if (!serverService) {
+                        // In case user specified path, register service one more time to map it to path.
+                        repository.registerService(pathKey, interfaceClass);
+                    }
+                    doExportUrlsFor1Protocol(protocolConfig, registryURLs, register);
+                }
+                return null;
             }
-            doExportUrlsFor1Protocol(protocolConfig, registryURLs);
-        }
+        );
 
         providerModel.setServiceUrls(urls);
     }
 
-    private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
+    private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs, boolean register) {
         Map<String, String> map = buildAttributes(protocolConfig);
 
         // remove null key and null value
@@ -419,7 +527,26 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
 
         URL url = buildUrl(protocolConfig, map);
 
-        exportUrl(url, registryURLs);
+        processServiceExecutor(url);
+
+        exportUrl(url, registryURLs, register);
+    }
+
+    private void processServiceExecutor(URL url) {
+        if (getExecutor() != null) {
+            String mode = application.getExecutorManagementMode();
+            if (!EXECUTOR_MANAGEMENT_MODE_ISOLATION.equals(mode)) {
+                logger.warn(COMMON_ISOLATED_EXECUTOR_CONFIGURATION_ERROR, "", "", "The current executor management mode is " + mode +
+                    ", the configured service executor cannot take effect unless the mode is configured as " + EXECUTOR_MANAGEMENT_MODE_ISOLATION);
+                return;
+            }
+            /**
+             * Because executor is not a string type, it cannot be attached to the url parameter, so it is added to URL#attributes
+             * and obtained it in IsolationExecutorRepository#createExecutor method
+             */
+            providerModel.getServiceMetadata().addAttribute(SERVICE_EXECUTOR, getExecutor());
+            url.getAttributes().put(SERVICE_EXECUTOR, getExecutor());
+        }
     }
 
     private Map<String, String> buildAttributes(ProtocolConfig protocolConfig) {
@@ -457,7 +584,9 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                 logger.warn(CONFIG_NO_METHOD_FOUND, "", "", "No method found in service interface: " + interfaceClass.getName());
                 map.put(METHODS_KEY, ANY_VALUE);
             } else {
-                map.put(METHODS_KEY, StringUtils.join(new HashSet<>(Arrays.asList(methods)), ","));
+                List<String> copyOfMethods = new ArrayList<>(Arrays.asList(methods));
+                copyOfMethods.sort(Comparator.naturalOrder());
+                map.put(METHODS_KEY, String.join(COMMA_SEPARATOR, copyOfMethods));
             }
         }
 
@@ -584,7 +713,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         return url;
     }
 
-    private void exportUrl(URL url, List<URL> registryURLs) {
+    private void exportUrl(URL url, List<URL> registryURLs, boolean register) {
         String scope = url.getParameter(SCOPE_KEY);
         // don't export when none is configured
         if (!SCOPE_NONE.equalsIgnoreCase(scope)) {
@@ -599,27 +728,31 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                 // export to extra protocol is used in remote export
                 String extProtocol = url.getParameter("ext.protocol", "");
                 List<String> protocols = new ArrayList<>();
-                // export original url
-                url = URLBuilder.from(url).
-                    addParameter(IS_PU_SERVER_KEY, Boolean.TRUE.toString()).
-                    removeParameter("ext.protocol").
-                    build();
-                url = exportRemote(url, registryURLs);
+
+                if (StringUtils.isNotBlank(extProtocol)) {
+                    // export original url
+                    url = URLBuilder.from(url).
+                        addParameter(IS_PU_SERVER_KEY, Boolean.TRUE.toString()).
+                        removeParameter("ext.protocol").
+                        build();
+                }
+
+                url = exportRemote(url, registryURLs, register);
                 if (!isGeneric(generic) && !getScopeModel().isInternal()) {
                     MetadataUtils.publishServiceDefinition(url, providerModel.getServiceModel(), getApplicationModel());
                 }
 
-                if (!extProtocol.equals("")) {
+                if (StringUtils.isNotBlank(extProtocol)) {
                     String[] extProtocols = extProtocol.split(",", -1);
                     protocols.addAll(Arrays.asList(extProtocols));
                 }
                 // export extra protocols
-                for(String protocol : protocols) {
-                    if(!protocol.equals("")){
+                for (String protocol : protocols) {
+                    if (StringUtils.isNotBlank(protocol)) {
                         URL localUrl = URLBuilder.from(url).
                             setProtocol(protocol).
                             build();
-                        localUrl = exportRemote(localUrl, registryURLs);
+                        localUrl = exportRemote(localUrl, registryURLs, register);
                         if (!isGeneric(generic) && !getScopeModel().isInternal()) {
                             MetadataUtils.publishServiceDefinition(localUrl, providerModel.getServiceModel(), getApplicationModel());
                         }
@@ -631,7 +764,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         this.urls.add(url);
     }
 
-    private URL exportRemote(URL url, List<URL> registryURLs) {
+    private URL exportRemote(URL url, List<URL> registryURLs, boolean register) {
         if (CollectionUtils.isNotEmpty(registryURLs)) {
             for (URL registryURL : registryURLs) {
                 if (SERVICE_REGISTRY_PROTOCOL.equals(registryURL.getProtocol())) {
@@ -663,7 +796,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                     }
                 }
 
-                doExportUrl(registryURL.putAttribute(EXPORT_KEY, url), true);
+                doExportUrl(registryURL.putAttribute(EXPORT_KEY, url), true, register);
             }
 
         } else {
@@ -672,7 +805,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                 logger.info("Export dubbo service " + interfaceClass.getName() + " to url " + url);
             }
 
-            doExportUrl(url, true);
+            doExportUrl(url, true, register);
         }
 
 
@@ -680,7 +813,10 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void doExportUrl(URL url, boolean withMetaData) {
+    private void doExportUrl(URL url, boolean withMetaData, boolean register) {
+        if (!register) {
+            url = url.addParameter(REGISTER_KEY, false);
+        }
         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, url);
         if (withMetaData) {
             invoker = new DelegateProviderMetaDataInvoker(invoker, this);
@@ -701,7 +837,8 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
             .build();
         local = local.setScopeModel(getScopeModel())
             .setServiceModel(providerModel);
-        doExportUrl(local, false);
+        local = local.addParameter(EXPORTER_LISTENER_KEY, LOCAL_PROTOCOL);
+        doExportUrl(local, false, true);
         logger.info("Export dubbo service " + interfaceClass.getName() + " to local registry url : " + local);
     }
 
@@ -877,6 +1014,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         }
     }
 
+    @Transient
     public Runnable getDestroyRunner() {
         return this::unexport;
     }

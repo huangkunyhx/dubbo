@@ -19,6 +19,7 @@ package org.apache.dubbo.rpc.cluster.support;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.constants.CommonConstants;
 import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.metrics.event.MetricsDispatcher;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Result;
@@ -28,6 +29,7 @@ import org.apache.dubbo.rpc.cluster.Directory;
 import org.apache.dubbo.rpc.cluster.LoadBalance;
 import org.apache.dubbo.rpc.cluster.directory.StaticDirectory;
 
+import org.apache.dubbo.rpc.model.ApplicationModel;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -46,7 +48,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import static org.mockito.Mockito.when;
 
 @SuppressWarnings("all")
-public class ConnectivityValidationTest {
+class ConnectivityValidationTest {
     private Invoker invoker1;
     private Invoker invoker2;
     private Invoker invoker3;
@@ -70,6 +72,7 @@ public class ConnectivityValidationTest {
 
     @BeforeEach
     public void setup() {
+        ApplicationModel.defaultModel().getBeanFactory().registerBean(MetricsDispatcher.class);
         invoker1 = Mockito.mock(Invoker.class);
         invoker2 = Mockito.mock(Invoker.class);
         invoker3 = Mockito.mock(Invoker.class);
@@ -134,7 +137,7 @@ public class ConnectivityValidationTest {
     }
 
     @Test
-    public void testBasic() throws InterruptedException {
+    void testBasic() throws InterruptedException {
         Invocation invocation = new RpcInvocation();
         LoadBalance loadBalance = new RandomLoadBalance();
 
@@ -181,7 +184,7 @@ public class ConnectivityValidationTest {
     }
 
     @Test
-    public void testRetry() throws InterruptedException {
+    void testRetry() throws InterruptedException {
         Invocation invocation = new RpcInvocation();
         LoadBalance loadBalance = new RandomLoadBalance();
 
@@ -204,7 +207,7 @@ public class ConnectivityValidationTest {
     }
 
     @Test
-    public void testRandomSelect() throws InterruptedException {
+    void testRandomSelect() throws InterruptedException {
         Invocation invocation = new RpcInvocation();
         LoadBalance loadBalance = new RandomLoadBalance();
 

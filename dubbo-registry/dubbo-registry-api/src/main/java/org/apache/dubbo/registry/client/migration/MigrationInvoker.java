@@ -18,7 +18,7 @@ package org.apache.dubbo.registry.client.migration;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.constants.CommonConstants;
-import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.status.reporter.FrameworkStatusReportService;
 import org.apache.dubbo.common.utils.CollectionUtils;
@@ -44,21 +44,22 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.REGISTRY_FAILED_NOTIFY_EVENT;
 import static org.apache.dubbo.registry.client.migration.model.MigrationStep.APPLICATION_FIRST;
 import static org.apache.dubbo.rpc.cluster.Constants.REFER_KEY;
 
 public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
-    private Logger logger = LoggerFactory.getLogger(MigrationInvoker.class);
+    private final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(MigrationInvoker.class);
 
     private URL url;
-    private URL consumerUrl;
-    private Cluster cluster;
-    private Registry registry;
-    private Class<T> type;
-    private RegistryProtocol registryProtocol;
+    private final URL consumerUrl;
+    private final Cluster cluster;
+    private final Registry registry;
+    private final Class<T> type;
+    private final RegistryProtocol registryProtocol;
     private MigrationRuleListener migrationRuleListener;
-    private ConsumerModel consumerModel;
-    private FrameworkStatusReportService reportService;
+    private final ConsumerModel consumerModel;
+    private final FrameworkStatusReportService reportService;
 
     private volatile ClusterInvoker<T> invoker;
     private volatile ClusterInvoker<T> serviceDiscoveryInvoker;
@@ -76,6 +77,7 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
         this(null, null, registryProtocol, cluster, registry, type, url, consumerUrl);
     }
 
+    @SuppressWarnings("unchecked")
     public MigrationInvoker(ClusterInvoker<T> invoker,
                             ClusterInvoker<T> serviceDiscoveryInvoker,
                             RegistryProtocol registryProtocol,
@@ -248,6 +250,7 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
         calcPreferredInvoker(newRule);
     }
 
+    @SuppressWarnings("all")
     private void waitAddressNotify(MigrationRule newRule, CountDownLatch latch) {
         // wait and compare threshold
         int delay = newRule.getDelay(consumerUrl);
@@ -255,7 +258,7 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
             try {
                 Thread.sleep(delay * 1000L);
             } catch (InterruptedException e) {
-                logger.error("Interrupted when waiting for address notify!" + e);
+                logger.error(REGISTRY_FAILED_NOTIFY_EVENT, "", "", "Interrupted when waiting for address notify!" + e);
             }
         } else {
             // do not wait address notify by default
@@ -264,7 +267,7 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
         try {
             latch.await(delay, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            logger.error("Interrupted when waiting for address notify!" + e);
+            logger.error(REGISTRY_FAILED_NOTIFY_EVENT, "", "", "Interrupted when waiting for address notify!" + e);
         }
     }
 
@@ -316,6 +319,7 @@ public class MigrationInvoker<T> implements MigrationClusterInvoker<T> {
             : (invoker != null && invoker.isAvailable()) || (serviceDiscoveryInvoker != null && serviceDiscoveryInvoker.isAvailable());
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void destroy() {
         if (migrationRuleListener != null) {

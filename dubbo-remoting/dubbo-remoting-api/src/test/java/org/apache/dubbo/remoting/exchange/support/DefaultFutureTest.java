@@ -35,18 +35,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class DefaultFutureTest {
+class DefaultFutureTest {
 
     private static final AtomicInteger index = new AtomicInteger();
 
     @Test
-    public void newFuture() {
+    void newFuture() {
         DefaultFuture future = defaultFuture(3000);
         Assertions.assertNotNull(future, "new future return null");
     }
 
     @Test
-    public void isDone() {
+    void isDone() {
         DefaultFuture future = defaultFuture(3000);
         Assertions.assertTrue(!future.isDone(), "init future is finished!");
 
@@ -127,15 +127,13 @@ public class DefaultFutureTest {
      * after a future is timeout , time is : 2021-01-22 10:55:05
      */
     @Test
-    public void interruptSend() throws Exception {
+    void interruptSend() throws Exception {
         final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         System.out.println("before a future is create , time is : " + LocalDateTime.now().format(formatter));
         // timeout after 1 seconds.
         Channel channel = new MockedChannel();
         int channelId = 10;
         Request request = new Request(channelId);
-        ExecutorService sharedExecutor = ExtensionLoader.getExtensionLoader(ExecutorRepository.class)
-                .getDefaultExtension().createExecutorIfAbsent(URL.valueOf("dubbo://127.0.0.1:23456"));
         ThreadlessExecutor executor = new ThreadlessExecutor();
         DefaultFuture f = DefaultFuture.newFuture(channel, request, 1000, executor);
         //mark the future is sent
@@ -143,11 +141,15 @@ public class DefaultFutureTest {
         // get operate will throw a interrupted exception, because the thread is interrupted.
         try {
             new InterruptThread(Thread.currentThread()).start();
-            executor.waitAndDrain();
+            while (!f. isDone()){
+                executor.waitAndDrain(Long.MAX_VALUE);
+            }
             f.get();
         } catch (Exception e) {
             Assertions.assertTrue(e instanceof InterruptedException, "catch exception is not interrupted exception!");
             System.out.println(e.getMessage());
+        } finally {
+            executor.shutdown();
         }
         //waiting timeout check task finished
         Thread.sleep(1500);
@@ -159,14 +161,24 @@ public class DefaultFutureTest {
     }
 
     @Test
-    public void testClose() throws Exception {
+    void testClose1() {
         Channel channel = new MockedChannel();
         Request request = new Request(123);
         ExecutorService executor = ExtensionLoader.getExtensionLoader(ExecutorRepository.class)
             .getDefaultExtension().createExecutorIfAbsent(URL.valueOf("dubbo://127.0.0.1:23456"));
         DefaultFuture.newFuture(channel, request, 1000, executor);
-        DefaultFuture.closeChannel(channel);
+        DefaultFuture.closeChannel(channel, 0);
         Assertions.assertFalse(executor.isTerminated());
+    }
+
+    @Test
+    void testClose2() {
+        Channel channel = new MockedChannel();
+        Request request = new Request(123);
+        ThreadlessExecutor threadlessExecutor = new ThreadlessExecutor();
+        DefaultFuture.newFuture(channel, request, 1000, threadlessExecutor);
+        DefaultFuture.closeChannel(channel, 0);
+        Assertions.assertTrue(threadlessExecutor.isTerminated());
     }
 
     /**

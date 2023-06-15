@@ -41,7 +41,7 @@ import static org.hamcrest.Matchers.hasProperty;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class ProtocolPortsMetadataCustomizerTest {
+class ProtocolPortsMetadataCustomizerTest {
 
     public DefaultServiceInstance instance;
     private MetadataService mockedMetadataService;
@@ -80,12 +80,12 @@ public class ProtocolPortsMetadataCustomizerTest {
     }
 
     @Test
-    public void test() {
+    void test() {
         ProtocolPortsMetadataCustomizer customizer = new ProtocolPortsMetadataCustomizer();
         customizer.customize(instance, ApplicationModel.defaultModel());
         String endpoints = instance.getMetadata().get(ENDPOINTS);
         assertNotNull(endpoints);
-        List<DefaultServiceInstance.Endpoint> endpointList = JsonUtils.getJson().toJavaList(endpoints, DefaultServiceInstance.Endpoint.class);
+        List<DefaultServiceInstance.Endpoint> endpointList = JsonUtils.toJavaList(endpoints, DefaultServiceInstance.Endpoint.class);
         assertEquals(2, endpointList.size());
         MatcherAssert.assertThat(endpointList, hasItem(hasProperty("protocol", equalTo("dubbo"))));
         MatcherAssert.assertThat(endpointList, hasItem(hasProperty("port", equalTo(20880))));

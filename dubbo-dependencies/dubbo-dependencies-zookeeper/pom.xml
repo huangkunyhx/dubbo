@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
-        <version>21</version>
+        <version>27</version>
         <relativePath />
     </parent>
 
@@ -32,9 +32,9 @@
     <packaging>pom</packaging>
 
     <properties>
-        <revision>3.1.1.1</revision>
-        <maven_flatten_version>1.1.0</maven_flatten_version>
-        <curator_version>4.2.0</curator_version>
+        <revision>3.2.3.1</revision>
+        <maven_flatten_version>1.5.0</maven_flatten_version>
+        <curator_version>4.3.0</curator_version>
         <zookeeper_version>3.4.14</zookeeper_version>
     </properties>
 
@@ -86,18 +86,18 @@
             <id>release</id>
             <build>
                 <plugins>
-<!--                    <plugin>-->
-<!--                        <groupId>org.apache.maven.plugins</groupId>-->
-<!--                        <artifactId>maven-gpg-plugin</artifactId>-->
-<!--                        <executions>-->
-<!--                            <execution>-->
-<!--                                <phase>verify</phase>-->
-<!--                                <goals>-->
-<!--                                    <goal>sign</goal>-->
-<!--                                </goals>-->
-<!--                            </execution>-->
-<!--                        </executions>-->
-<!--                    </plugin>-->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
                 </plugins>
             </build>
         </profile>

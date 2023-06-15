@@ -92,8 +92,13 @@ public class ModuleConfig extends AbstractConfig {
      */
     private Integer exportThreadNum;
 
+    /**
+     * The timeout to check references
+     */
+    private Long checkReferenceTimeout;
+
     public ModuleConfig() {
-        super(ApplicationModel.defaultModel().getDefaultModule());
+        super();
     }
 
     public ModuleConfig(ModuleModel moduleModel) {
@@ -127,6 +132,16 @@ public class ModuleConfig extends AbstractConfig {
         if (!(scopeModel instanceof ModuleModel)) {
             throw new IllegalArgumentException("Invalid scope model, expect to be a ModuleModel but got: " + scopeModel);
         }
+    }
+
+    @Override
+    public ModuleModel getScopeModel() {
+        return (ModuleModel) super.getScopeModel();
+    }
+
+    @Override
+    protected ScopeModel getDefaultModel() {
+        return ApplicationModel.defaultModel().getDefaultModule();
     }
 
     @Parameter(key = "module")
@@ -240,5 +255,13 @@ public class ModuleConfig extends AbstractConfig {
 
     public void setExportAsync(Boolean exportAsync) {
         this.exportAsync = exportAsync;
+    }
+
+    public Long getCheckReferenceTimeout() {
+        return checkReferenceTimeout;
+    }
+
+    public void setCheckReferenceTimeout(Long checkReferenceTimeout) {
+        this.checkReferenceTimeout = checkReferenceTimeout;
     }
 }

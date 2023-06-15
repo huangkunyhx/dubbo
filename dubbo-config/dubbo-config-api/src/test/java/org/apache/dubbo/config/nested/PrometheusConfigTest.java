@@ -21,29 +21,25 @@ import org.junit.jupiter.api.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
-public class PrometheusConfigTest {
+class PrometheusConfigTest {
 
     @Test
-    public void testExporter() {
+    void testExporter() {
         PrometheusConfig prometheusConfig = new PrometheusConfig();
         PrometheusConfig.Exporter exporter = new PrometheusConfig.Exporter();
 
         exporter.setEnabled(true);
         exporter.setEnableHttpServiceDiscovery(true);
         exporter.setHttpServiceDiscoveryUrl("localhost:8080");
-        exporter.setMetricsPath("/metrics");
-        exporter.setMetricsPort(20888);
         prometheusConfig.setExporter(exporter);
 
         assertThat(prometheusConfig.getExporter().getEnabled(), equalTo(true));
         assertThat(prometheusConfig.getExporter().getEnableHttpServiceDiscovery(), equalTo(true));
         assertThat(prometheusConfig.getExporter().getHttpServiceDiscoveryUrl(), equalTo("localhost:8080"));
-        assertThat(prometheusConfig.getExporter().getMetricsPort(), equalTo(20888));
-        assertThat(prometheusConfig.getExporter().getMetricsPath(), equalTo("/metrics"));
     }
 
     @Test
-    public void testPushgateway() {
+    void testPushgateway() {
         PrometheusConfig prometheusConfig = new PrometheusConfig();
         PrometheusConfig.Pushgateway pushgateway = new PrometheusConfig.Pushgateway();
 

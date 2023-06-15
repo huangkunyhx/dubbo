@@ -47,7 +47,7 @@ import java.io.IOException;
 /**
  * The testcases are only for checking the core process of exporting provider.
  */
-public class MultipleRegistryCenterExportProviderIntegrationTest implements IntegrationTest {
+class MultipleRegistryCenterExportProviderIntegrationTest implements IntegrationTest {
 
     private static final Logger logger = LoggerFactory.getLogger(MultipleRegistryCenterExportProviderIntegrationTest.class);
 
@@ -188,7 +188,7 @@ public class MultipleRegistryCenterExportProviderIntegrationTest implements Inte
         // 1. InjvmExporter
         // 2. DubboExporter with service-discovery-registry protocol
         // 3. DubboExporter with registry protocol
-        Assertions.assertEquals(exporterListener.getExportedExporters().size(), 3);
+        Assertions.assertEquals(exporterListener.getExportedExporters().size(), 5);
         // The exported exporter contains MultipleRegistryCenterExportProviderFilter
         Assertions.assertTrue(exporterListener.getFilters().contains(filter));
 

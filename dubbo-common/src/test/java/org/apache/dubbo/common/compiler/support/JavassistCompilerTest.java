@@ -23,14 +23,14 @@ import org.junit.jupiter.api.condition.JRE;
 
 import java.lang.reflect.Method;
 
-public class JavassistCompilerTest extends JavaCodeTest {
+class JavassistCompilerTest extends JavaCodeTest {
     @Test
-    public void testCompileJavaClass() throws Exception {
+    void testCompileJavaClass() throws Exception {
         JavassistCompiler compiler = new JavassistCompiler();
         Class<?> clazz = compiler.compile(JavaCodeTest.class, getSimpleCode(), JavassistCompiler.class.getClassLoader());
 
         // Because javassist compiles using the caller class loader, we should't use HelloService directly
-        Object instance = clazz.newInstance();
+        Object instance = clazz.getDeclaredConstructor().newInstance();
         Method sayHello = instance.getClass().getMethod("sayHello");
         Assertions.assertEquals("Hello world!", sayHello.invoke(instance));
     }
@@ -48,37 +48,37 @@ public class JavassistCompilerTest extends JavaCodeTest {
             Assertions.assertThrows(RuntimeException.class, () -> compiler.compile(null, getSimpleCodeWithoutPackage(), JavassistCompiler.class.getClassLoader()));
         } else {
             Class<?> clazz = compiler.compile(null, getSimpleCodeWithoutPackage(), JavassistCompiler.class.getClassLoader());
-            Object instance = clazz.newInstance();
+            Object instance = clazz.getDeclaredConstructor().newInstance();
             Method sayHello = instance.getClass().getMethod("sayHello");
             Assertions.assertEquals("Hello world!", sayHello.invoke(instance));
         }
     }
 
     @Test
-    public void testCompileJavaClass1() throws Exception {
+    void testCompileJavaClass1() {
         Assertions.assertThrows(IllegalStateException.class, () -> {
             JavassistCompiler compiler = new JavassistCompiler();
             Class<?> clazz = compiler.compile(JavaCodeTest.class, getSimpleCodeWithSyntax0(), JavassistCompiler.class.getClassLoader());
-            Object instance = clazz.newInstance();
+            Object instance = clazz.getDeclaredConstructor().newInstance();
             Method sayHello = instance.getClass().getMethod("sayHello");
             Assertions.assertEquals("Hello world!", sayHello.invoke(instance));
         });
     }
 
     @Test
-    public void testCompileJavaClassWithImport() throws Exception {
+    void testCompileJavaClassWithImport() throws Exception {
         JavassistCompiler compiler = new JavassistCompiler();
         Class<?> clazz = compiler.compile(JavaCodeTest.class, getSimpleCodeWithImports(), JavassistCompiler.class.getClassLoader());
-        Object instance = clazz.newInstance();
+        Object instance = clazz.getDeclaredConstructor().newInstance();
         Method sayHello = instance.getClass().getMethod("sayHello");
         Assertions.assertEquals("Hello world!", sayHello.invoke(instance));
     }
 
     @Test
-    public void testCompileJavaClassWithExtends() throws Exception {
+    void testCompileJavaClassWithExtends() throws Exception {
         JavassistCompiler compiler = new JavassistCompiler();
         Class<?> clazz = compiler.compile(JavaCodeTest.class, getSimpleCodeWithWithExtends(), JavassistCompiler.class.getClassLoader());
-        Object instance = clazz.newInstance();
+        Object instance = clazz.getDeclaredConstructor().newInstance();
         Method sayHello = instance.getClass().getMethod("sayHello");
         Assertions.assertEquals("Hello world3!", sayHello.invoke(instance));
     }

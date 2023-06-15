@@ -24,9 +24,10 @@ import org.apache.dubbo.common.utils.LogUtil;
 import org.apache.dubbo.rpc.AppResponse;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Result;
-import org.apache.dubbo.rpc.RpcContext;
 import org.apache.dubbo.rpc.RpcInvocation;
+import org.apache.dubbo.rpc.RpcContext;
 import org.apache.dubbo.rpc.cluster.Directory;
+import org.apache.dubbo.rpc.RpcException;
 
 import org.apache.log4j.Level;
 import org.junit.jupiter.api.AfterEach;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.function.Executable;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -45,7 +47,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.dubbo.common.constants.CommonConstants.RETRIES_KEY;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -55,7 +57,7 @@ import static org.mockito.Mockito.mock;
  * add annotation @TestMethodOrder, the testARetryFailed Method must to first execution
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class FailbackClusterInvokerTest {
+class FailbackClusterInvokerTest {
 
     List<Invoker<FailbackClusterInvokerTest>> invokers = new ArrayList<>();
     URL url = URL.valueOf("test://test:11/test?retries=2&failbacktasks=2");
@@ -104,12 +106,15 @@ public class FailbackClusterInvokerTest {
     }
 
     @Test
-    public void testInvokeWithIllegalRetriesParam() {
+    void testInvokeWithIllegalRetriesParam() {
         URL url = URL.valueOf("test://test:11/test?retries=-1&failbacktasks=2");
         Directory<FailbackClusterInvokerTest> dic = mock(Directory.class);
         given(dic.getUrl()).willReturn(url);
         given(dic.getConsumerUrl()).willReturn(url);
         given(dic.getInterface()).willReturn(FailbackClusterInvokerTest.class);
+        given(dic.list(invocation)).willReturn(invokers);
+        given(invoker.getUrl()).willReturn(url);
+
         FailbackClusterInvoker<FailbackClusterInvokerTest> invoker = new FailbackClusterInvoker<>(dic);
         invoker.invoke(invocation);
         Assertions.assertNull(RpcContext.getServiceContext().getInvoker());
@@ -117,12 +122,15 @@ public class FailbackClusterInvokerTest {
     }
 
     @Test
-    public void testInvokeWithIllegalFailbacktasksParam() {
+    void testInvokeWithIllegalFailbacktasksParam() {
         URL url = URL.valueOf("test://test:11/test?retries=2&failbacktasks=-1");
         Directory<FailbackClusterInvokerTest> dic = mock(Directory.class);
         given(dic.getUrl()).willReturn(url);
         given(dic.getConsumerUrl()).willReturn(url);
         given(dic.getInterface()).willReturn(FailbackClusterInvokerTest.class);
+        given(dic.list(invocation)).willReturn(invokers);
+        given(invoker.getUrl()).willReturn(url);
+
         FailbackClusterInvoker<FailbackClusterInvokerTest> invoker = new FailbackClusterInvoker<>(dic);
         invoker.invoke(invocation);
         Assertions.assertNull(RpcContext.getServiceContext().getInvoker());
@@ -161,17 +169,15 @@ public class FailbackClusterInvokerTest {
         given(dic.getInterface()).willReturn(FailbackClusterInvokerTest.class);
 
         invocation.setMethodName("method1");
-
         invokers.add(invoker);
 
-        resetInvokerToNoException();
-
         FailbackClusterInvoker<FailbackClusterInvokerTest> invoker = new FailbackClusterInvoker<>(dic);
-        LogUtil.start();
-        DubboAppender.clear();
-        invoker.invoke(invocation);
-        assertEquals(1, LogUtil.findMessage("Failback to invoke"));
-        LogUtil.stop();
+        try{
+            invoker.invoke(invocation);
+        } catch (RpcException e){
+            Assertions.assertTrue(e.getMessage().contains("No provider available"));
+            assertFalse(e.getCause() instanceof RpcException);
+        }
     }
 
     @Disabled

@@ -46,7 +46,7 @@ import static org.apache.dubbo.common.constants.CommonConstants.PROVIDER_SIDE;
 import static org.apache.dubbo.common.constants.CommonConstants.SYNC_REPORT_KEY;
 import static redis.embedded.RedisServer.newRedisServer;
 
-public class RedisMetadataReportTest {
+class RedisMetadataReportTest {
 
     private static final String
         REDIS_URL_TEMPLATE = "redis://%slocalhost:%d",
@@ -59,7 +59,7 @@ public class RedisMetadataReportTest {
     URL registryUrl;
 
     @BeforeEach
-    public void constructor(final TestInfo testInfo) throws IOException {
+    public void constructor(final TestInfo testInfo) {
         final boolean usesAuthentication = usesAuthentication(testInfo);
         int redisPort = 0;
         IOException exception = null;
@@ -107,12 +107,12 @@ public class RedisMetadataReportTest {
     }
 
     @Test
-    public void testAsyncStoreProvider() throws ClassNotFoundException {
+    void testAsyncStoreProvider() throws ClassNotFoundException {
         testStoreProvider(redisMetadataReport, "1.0.0.redis.md.p1", 3000);
     }
 
     @Test
-    public void testSyncStoreProvider() throws ClassNotFoundException {
+    void testSyncStoreProvider() throws ClassNotFoundException {
         testStoreProvider(syncRedisMetadataReport, "1.0.0.redis.md.p2", 3);
     }
 
@@ -133,7 +133,7 @@ public class RedisMetadataReportTest {
 
             Assertions.assertNotNull(value);
 
-            FullServiceDefinition fullServiceDefinition = JsonUtils.getJson().toJavaObject(value, FullServiceDefinition.class);
+            FullServiceDefinition fullServiceDefinition = JsonUtils.toJavaObject(value, FullServiceDefinition.class);
             Assertions.assertEquals(fullServiceDefinition.getParameters().get("paramTest"), "redisTest");
         } catch (Throwable e) {
             throw new RpcException("Failed to put to redis . cause: " + e.getMessage(), e);
@@ -146,12 +146,12 @@ public class RedisMetadataReportTest {
     }
 
     @Test
-    public void testAsyncStoreConsumer() throws ClassNotFoundException {
+    void testAsyncStoreConsumer() throws ClassNotFoundException {
         testStoreConsumer(redisMetadataReport, "1.0.0.redis.md.c1", 3000);
     }
 
     @Test
-    public void testSyncStoreConsumer() throws ClassNotFoundException {
+    void testSyncStoreConsumer() throws ClassNotFoundException {
         testStoreConsumer(syncRedisMetadataReport, "1.0.0.redis.md.c2", 3);
     }
 
@@ -216,12 +216,12 @@ public class RedisMetadataReportTest {
     }
 
     @Test
-    public void testAuthRedisMetadata() throws ClassNotFoundException {
+    void testAuthRedisMetadata() throws ClassNotFoundException {
         testStoreProvider(redisMetadataReport, "1.0.0.redis.md.p1", 3000);
     }
 
     @Test
-    public void testWrongAuthRedisMetadata() throws ClassNotFoundException {
+    void testWrongAuthRedisMetadata() throws ClassNotFoundException {
         registryUrl = registryUrl.setPassword("123456");
         redisMetadataReport = (RedisMetadataReport) new RedisMetadataReportFactory().createMetadataReport(registryUrl);
         try {

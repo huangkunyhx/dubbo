@@ -41,11 +41,12 @@ import org.springframework.context.annotation.PropertySource;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-public class JavaConfigReferenceBeanTest {
+class JavaConfigReferenceBeanTest {
 
     @BeforeEach
     public void setUp() {
@@ -58,7 +59,7 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testAnnotationAtField() {
+    void testAnnotationAtField() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CommonConfig.class,
             AnnotationAtFieldConfiguration.class);
 
@@ -97,6 +98,63 @@ public class JavaConfigReferenceBeanTest {
         }
     }
 
+    @Test
+    void testLazyProxy1() {
+        AnnotationConfigApplicationContext context = null;
+        try {
+            context = new AnnotationConfigApplicationContext(CommonConfig.class,
+                LazyProxyConfiguration1.class);
+            HelloService helloServiceClient = context.getBean("helloServiceClient", HelloService.class);
+            Assertions.assertNotNull(helloServiceClient);
+            Assertions.assertInstanceOf(HelloService.class, helloServiceClient);
+            Class<? extends HelloService> clientClass = helloServiceClient.getClass();
+            Assertions.assertFalse(Modifier.isFinal(clientClass.getModifiers()));
+            Assertions.assertEquals("Hello, dubbo", helloServiceClient.sayHello("dubbo"));
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    @Test
+    void testLazyProxy2() {
+        AnnotationConfigApplicationContext context = null;
+        try {
+            context = new AnnotationConfigApplicationContext(CommonConfig.class,
+                LazyProxyConfiguration2.class);
+            HelloService helloServiceClient = context.getBean("helloServiceClient", HelloService.class);
+            Assertions.assertNotNull(helloServiceClient);
+            Assertions.assertInstanceOf(HelloService.class, helloServiceClient);
+            Class<? extends HelloService> clientClass = helloServiceClient.getClass();
+            Assertions.assertFalse(Modifier.isFinal(clientClass.getModifiers()));
+            Assertions.assertEquals("Hello, dubbo", helloServiceClient.sayHello("dubbo"));
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    @Test
+    void testLazyProxy3() {
+        AnnotationConfigApplicationContext context = null;
+        try {
+            context = new AnnotationConfigApplicationContext(CommonConfig.class,
+                LazyProxyConfiguration3.class);
+            HelloService helloServiceClient = context.getBean("helloServiceClient", HelloService.class);
+            Assertions.assertNotNull(helloServiceClient);
+            Assertions.assertInstanceOf(HelloService.class, helloServiceClient);
+            Class<? extends HelloService> clientClass = helloServiceClient.getClass();
+            Assertions.assertTrue(Modifier.isFinal(clientClass.getModifiers()));
+            Assertions.assertEquals("Hello, dubbo", helloServiceClient.sayHello("dubbo"));
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
     private String getStackTrace(Throwable ex) {
         StringWriter stringWriter = new StringWriter();
         ex.printStackTrace(new PrintWriter(stringWriter));
@@ -104,9 +162,9 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testAnnotationBean() {
+    void testAnnotationBean() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CommonConfig.class,
-                AnnotationBeanConfiguration.class);
+            AnnotationBeanConfiguration.class);
 
         try {
             Map<String, HelloService> helloServiceMap = context.getBeansOfType(HelloService.class);
@@ -126,7 +184,7 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testGenericServiceAnnotationBean() {
+    void testGenericServiceAnnotationBean() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CommonConfig.class,
             GenericServiceAnnotationBeanConfiguration.class);
 
@@ -163,9 +221,9 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testReferenceBean() {
+    void testReferenceBean() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CommonConfig.class,
-                ReferenceBeanConfiguration.class);
+            ReferenceBeanConfiguration.class);
 
         try {
             Map<String, HelloService> helloServiceMap = context.getBeansOfType(HelloService.class);
@@ -188,7 +246,7 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testGenericServiceReferenceBean() {
+    void testGenericServiceReferenceBean() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(CommonConfig.class,
             GenericServiceReferenceBeanConfiguration.class);
 
@@ -215,7 +273,7 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testRawReferenceBean() {
+    void testRawReferenceBean() {
         AnnotationConfigApplicationContext context = null;
         try {
             context = new AnnotationConfigApplicationContext(CommonConfig.class, ReferenceBeanWithoutGenericTypeConfiguration.class);
@@ -234,7 +292,7 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testInconsistentBean() {
+    void testInconsistentBean() {
         AnnotationConfigApplicationContext context = null;
         try {
             context = new AnnotationConfigApplicationContext(CommonConfig.class, InconsistentBeanConfiguration.class);
@@ -252,7 +310,7 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testMissingGenericTypeBean() {
+    void testMissingGenericTypeBean() {
         AnnotationConfigApplicationContext context = null;
         try {
             context = new AnnotationConfigApplicationContext(CommonConfig.class, MissingGenericTypeAnnotationBeanConfiguration.class);
@@ -269,7 +327,7 @@ public class JavaConfigReferenceBeanTest {
     }
 
     @Test
-    public void testMissingInterfaceTypeBean() {
+    void testMissingInterfaceTypeBean() {
         AnnotationConfigApplicationContext context = null;
         try {
             context = new AnnotationConfigApplicationContext(CommonConfig.class, MissingInterfaceTypeAnnotationBeanConfiguration.class);
@@ -317,6 +375,42 @@ public class JavaConfigReferenceBeanTest {
 
 
     @Configuration
+    public static class LazyProxyConfiguration1 {
+
+        @DubboReference(group = "${myapp.group}")
+        private HelloService helloService;
+
+        @Bean(name = "helloServiceClient")
+        public HelloService helloService() {
+            return helloService;
+        }
+    }
+
+    @Configuration
+    public static class LazyProxyConfiguration2 {
+
+        @DubboReference(group = "${myapp.group}", proxy = "javassist")
+        private HelloService helloService;
+
+        @Bean(name = "helloServiceClient")
+        public HelloService helloService() {
+            return helloService;
+        }
+    }
+
+    @Configuration
+    public static class LazyProxyConfiguration3 {
+
+        @DubboReference(group = "${myapp.group}", proxy = "jdk")
+        private HelloService helloService;
+
+        @Bean(name = "helloServiceClient")
+        public HelloService helloService() {
+            return helloService;
+        }
+    }
+
+    @Configuration
     public static class AnnotationAtFieldConfiguration {
 
         @DubboReference(group = "${myapp.group}")
@@ -353,7 +447,7 @@ public class JavaConfigReferenceBeanTest {
         }
 
         @Bean
-        @Reference(group = "${myapp.group}", interfaceName = "org.apache.dubbo.config.spring.api.LocalMissClass")
+        @DubboReference(group = "${myapp.group}", interfaceName = "org.apache.dubbo.config.spring.api.LocalMissClass", scope = "local")
         public ReferenceBean<GenericService> genericServiceWithoutInterface() {
             return new ReferenceBean();
         }
@@ -365,8 +459,8 @@ public class JavaConfigReferenceBeanTest {
         @Bean
         public ReferenceBean<HelloService> helloService() {
             return new ReferenceBeanBuilder()
-                    .setGroup("${myapp.group}")
-                    .build();
+                .setGroup("${myapp.group}")
+                .build();
         }
 
         @Bean
@@ -394,9 +488,9 @@ public class JavaConfigReferenceBeanTest {
         @Bean
         public ReferenceBean helloService() {
             return new ReferenceBeanBuilder()
-                    .setGroup("${myapp.group}")
-                    .setInterface(HelloService.class)
-                    .build();
+                .setGroup("${myapp.group}")
+                .setInterface(HelloService.class)
+                .build();
         }
 
     }

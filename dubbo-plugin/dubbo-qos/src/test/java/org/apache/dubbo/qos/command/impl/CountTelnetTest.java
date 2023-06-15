@@ -18,8 +18,8 @@ package org.apache.dubbo.qos.command.impl;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.ExtensionLoader;
-import org.apache.dubbo.qos.command.BaseCommand;
-import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.api.BaseCommand;
+import org.apache.dubbo.qos.api.CommandContext;
 import org.apache.dubbo.qos.command.impl.channel.MockNettyChannel;
 import org.apache.dubbo.qos.legacy.service.DemoService;
 import org.apache.dubbo.remoting.telnet.support.TelnetUtils;
@@ -43,7 +43,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 
-public class CountTelnetTest {
+class CountTelnetTest {
     private BaseCommand count;
 
     private MockNettyChannel mockChannel;
@@ -75,7 +75,7 @@ public class CountTelnetTest {
     }
 
     @Test
-    public void test() throws Exception {
+    void test() throws Exception {
         String methodName = "sayHello";
         String[] args = new String[]{"org.apache.dubbo.qos.legacy.service.DemoService", "sayHello", "1"};
 

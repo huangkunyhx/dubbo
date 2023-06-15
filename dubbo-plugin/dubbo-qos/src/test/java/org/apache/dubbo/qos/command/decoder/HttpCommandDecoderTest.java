@@ -16,7 +16,7 @@
  */
 package org.apache.dubbo.qos.command.decoder;
 
-import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.api.CommandContext;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -35,9 +35,9 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class HttpCommandDecoderTest {
+class HttpCommandDecoderTest {
     @Test
-    public void decodeGet() throws Exception {
+    void decodeGet() {
         HttpRequest request = mock(HttpRequest.class);
         when(request.uri()).thenReturn("localhost:80/test");
         when(request.method()).thenReturn(HttpMethod.GET);
@@ -50,7 +50,7 @@ public class HttpCommandDecoderTest {
     }
 
     @Test
-    public void decodePost() throws Exception {
+    void decodePost() {
         FullHttpRequest request = mock(FullHttpRequest.class);
         when(request.uri()).thenReturn("localhost:80/test");
         when(request.method()).thenReturn(HttpMethod.POST);

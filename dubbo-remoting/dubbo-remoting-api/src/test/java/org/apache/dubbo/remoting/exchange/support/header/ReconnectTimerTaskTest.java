@@ -18,8 +18,8 @@ package org.apache.dubbo.remoting.exchange.support.header;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.timer.HashedWheelTimer;
-import org.apache.dubbo.remoting.Channel;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_VERSION_KEY;
 import static org.apache.dubbo.remoting.Constants.HEARTBEAT_CHECK_TICK;
 
-public class ReconnectTimerTaskTest {
+class ReconnectTimerTaskTest {
 
     private URL url = URL.valueOf("dubbo://localhost:20880");
 
@@ -56,19 +56,21 @@ public class ReconnectTimerTaskTest {
             }
         };
 
-        AbstractTimerTask.ChannelProvider cp = () -> Collections.<Channel>singletonList(channel);
-        reconnectTimerTask = new ReconnectTimerTask(cp, tickDuration / HEARTBEAT_CHECK_TICK, (int) tickDuration);
+        reconnectTimerTask = new ReconnectTimerTask(() -> Collections.singleton(channel), reconnectTimer, tickDuration / HEARTBEAT_CHECK_TICK, (int) tickDuration);
+    }
+
+    @AfterEach
+    public void teardown() {
+        reconnectTimerTask.cancel();
     }
 
     @Test
-    public void testReconnect() throws Exception {
+    void testReconnect() throws Exception {
         long now = System.currentTimeMillis();
 
         url = url.addParameter(DUBBO_VERSION_KEY, "2.1.1");
         channel.setAttribute(HeartbeatHandler.KEY_READ_TIMESTAMP, now - 1000);
         channel.setAttribute(HeartbeatHandler.KEY_WRITE_TIMESTAMP, now - 1000);
-
-        reconnectTimer.newTimeout(reconnectTimerTask, 250, TimeUnit.MILLISECONDS);
 
         Thread.sleep(2000L);
         Assertions.assertTrue(channel.getReconnectCount() > 0);

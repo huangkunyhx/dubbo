@@ -36,6 +36,7 @@ import static org.apache.dubbo.common.constants.CommonConstants.GROUP_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.INTERFACE_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.TIMEOUT_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.VERSION_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.PAYLOAD;
 import static org.apache.dubbo.metadata.RevisionResolver.EMPTY_REVISION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Some construction and filter cases are covered in InMemoryMetadataServiceTest
  */
-public class MetadataInfoTest {
+class MetadataInfoTest {
     private static URL url = URL.valueOf("dubbo://30.225.21.30:20880/org.apache.dubbo.registry.service.DemoService2?" +
         "REGISTRY_CLUSTER=registry1&anyhost=true&application=demo-provider2&delay=5000&deprecated=false&dubbo=2.0.2" +
         "&dynamic=true&generic=false&group=greeting&interface=org.apache.dubbo.registry.service.DemoService2" +
@@ -66,8 +67,14 @@ public class MetadataInfoTest {
         "&metadata-type=remote&methods=sayHello&sayHello.timeout=7000&pid=36621&release=&revision=1.0.0&service-name-mapping=true" +
         "&side=provider&timeout=5000&timestamp=1629970068002&version=1.0.0&params-filter=-customized,excluded");
 
+    private static URL url4 = URL.valueOf("dubbo://30.225.21.30:20880/org.apache.dubbo.registry.service.DemoService?" +
+        "REGISTRY_CLUSTER=registry1&anyhost=true&application=demo-provider2&delay=5000&deprecated=false&dubbo=2.0.2" +
+        "&dynamic=true&generic=false&group=greeting&interface=org.apache.dubbo.registry.service.DemoService" +
+        "&metadata-type=remote&methods=sayHello&sayHello.timeout=7000&pid=36621&release=&revision=1.0.0&service-name-mapping=true" +
+        "&side=provider&timeout=5000&timestamp=1629970068002&version=1.0.0&params-filter=-customized,excluded&payload=1024");
+
     @Test
-    public void testEmptyRevision() {
+    void testEmptyRevision() {
         MetadataInfo metadataInfo = new MetadataInfo("demo");
         metadataInfo.setApp("demo");
 
@@ -75,7 +82,7 @@ public class MetadataInfoTest {
     }
 
     @Test
-    public void testParamsFilterIncluded() {
+    void testParamsFilterIncluded() {
         MetadataInfo metadataInfo = new MetadataInfo("demo");
 
         // export normal url again
@@ -93,7 +100,7 @@ public class MetadataInfoTest {
     }
 
     @Test
-    public void testParamsFilterExcluded() {
+    void testParamsFilterExcluded() {
         MetadataInfo metadataInfo = new MetadataInfo("demo");
 
         // export normal url again
@@ -111,7 +118,7 @@ public class MetadataInfoTest {
     }
 
     @Test
-    public void testEqualsAndRevision() {
+    void testEqualsAndRevision() {
         // same metadata
         MetadataInfo metadataInfo = new MetadataInfo("demo");
         metadataInfo.addService(url);
@@ -144,7 +151,7 @@ public class MetadataInfoTest {
     }
 
     @Test
-    public void testChanged() {
+    void testChanged() {
         MetadataInfo metadataInfo = new MetadataInfo("demo");
         metadataInfo.addService(url);
         metadataInfo.addService(url2);
@@ -156,23 +163,23 @@ public class MetadataInfoTest {
     }
 
     @Test
-    public void testJsonFormat() {
+    void testJsonFormat() {
         MetadataInfo metadataInfo = new MetadataInfo("demo");
 
         // export normal url again
         metadataInfo.addService(url);
-        System.out.println(JsonUtils.getJson().toJson(metadataInfo));
+        System.out.println(JsonUtils.toJson(metadataInfo));
 
         MetadataInfo metadataInfo2 = new MetadataInfo("demo");
         // export normal url again
         metadataInfo2.addService(url);
         metadataInfo2.addService(url2);
-        System.out.println(JsonUtils.getJson().toJson(metadataInfo2));
+        System.out.println(JsonUtils.toJson(metadataInfo2));
 
     }
 
     @Test
-    public void testJdkSerialize() throws IOException, ClassNotFoundException, NoSuchFieldException, IllegalAccessException {
+    void testJdkSerialize() throws IOException, ClassNotFoundException, NoSuchFieldException, IllegalAccessException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
         MetadataInfo metadataInfo = new MetadataInfo("demo");
@@ -195,7 +202,7 @@ public class MetadataInfoTest {
     }
 
     @Test
-    public void testCal() {
+    void testCal() {
         MetadataInfo metadataInfo = new MetadataInfo("demo");
 
         // export normal url again
@@ -211,8 +218,18 @@ public class MetadataInfoTest {
 
         metadataInfo.calAndGetRevision();
 
-        Map<String, Object> ret  = JsonUtils.getJson().toJavaObject(metadataInfo.getContent(), Map.class);
+        Map<String, Object> ret  = JsonUtils.toJavaObject(metadataInfo.getContent(), Map.class);
         assertNull(ret.get("content"));
         assertNull(ret.get("rawMetadataInfo"));
+    }
+
+    @Test
+    void testPayload() {
+        MetadataInfo metadataInfo = new MetadataInfo("demo");
+
+        metadataInfo.addService(url4);
+        MetadataInfo.ServiceInfo serviceInfo4 = metadataInfo.getServiceInfo(url4.getProtocolServiceKey());
+        assertNotNull(serviceInfo4);
+        assertEquals("1024", serviceInfo4.getParameter(PAYLOAD));
     }
 }

@@ -110,6 +110,13 @@ public interface RegistryConstants {
     String PROVIDER_PORT = "provider-port";
 
     /**
+     * provider namespace
+     *
+     * @since 3.1.1
+     */
+    String PROVIDER_NAMESPACE = "provider-namespace";
+
+    /**
      * The request size of service instances
      *
      * @since 2.7.5
@@ -133,6 +140,7 @@ public interface RegistryConstants {
     float DEFAULT_HASHMAP_LOAD_FACTOR = 0.75f;
 
     String ENABLE_EMPTY_PROTECTION_KEY = "enable-empty-protection";
+    boolean DEFAULT_ENABLE_EMPTY_PROTECTION = false;
     String REGISTER_CONSUMER_URL_KEY = "register-consumer-url";
 
 }

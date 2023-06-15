@@ -35,6 +35,7 @@ import org.apache.dubbo.rpc.RpcInvocation;
 import org.apache.dubbo.rpc.model.ApplicationModel;
 import org.apache.dubbo.rpc.model.FrameworkModel;
 import org.apache.dubbo.rpc.model.ModuleServiceRepository;
+import org.apache.dubbo.rpc.protocol.PermittedSerializationKeeper;
 import org.apache.dubbo.rpc.protocol.dubbo.DecodeableRpcInvocation;
 import org.apache.dubbo.rpc.protocol.dubbo.DubboCodec;
 import org.apache.dubbo.rpc.protocol.dubbo.support.DemoService;
@@ -53,12 +54,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.apache.dubbo.rpc.Constants.SERIALIZATION_SECURITY_CHECK_KEY;
-
 /**
  * These junit tests aim to test unpack and stick pack of dubbo and telnet
  */
-public class DubboTelnetDecodeTest {
+class DubboTelnetDecodeTest {
     private static AtomicInteger dubbo = new AtomicInteger(0);
 
     private static AtomicInteger telnet = new AtomicInteger(0);
@@ -75,16 +74,11 @@ public class DubboTelnetDecodeTest {
     public static void setup() {
         ModuleServiceRepository serviceRepository = ApplicationModel.defaultModel().getDefaultModule().getServiceRepository();
         serviceRepository.registerService(DemoService.class);
-
-        // disable org.apache.dubbo.remoting.transport.CodecSupport.checkSerialization to avoid error:
-        // java.io.IOException: Service org.apache.dubbo.rpc.protocol.dubbo.support.DemoService with version 0.0.0 not found, invocation rejected.
-        System.setProperty(SERIALIZATION_SECURITY_CHECK_KEY, "false");
     }
 
     @AfterAll
     public static void teardown() {
         FrameworkModel.defaultModel().destroy();
-        System.clearProperty(SERIALIZATION_SECURITY_CHECK_KEY);
 
     }
 
@@ -94,7 +88,7 @@ public class DubboTelnetDecodeTest {
      * @throws InterruptedException
      */
     @Test
-    public void testDubboDecode() throws InterruptedException, IOException {
+    void testDubboDecode() throws InterruptedException, IOException {
         ByteBuf dubboByteBuf = createDubboByteBuf();
 
         EmbeddedChannel ch = null;
@@ -106,7 +100,7 @@ public class DubboTelnetDecodeTest {
             MockHandler mockHandler = new MockHandler(null,
                     new MultiMessageHandler(
                             new DecodeHandler(
-                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter() {
+                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter(FrameworkModel.defaultModel()) {
                                         @Override
                                         public CompletableFuture<Object> reply(ExchangeChannel channel, Object msg) {
                                             if (checkDubboDecoded(msg)) {
@@ -141,7 +135,7 @@ public class DubboTelnetDecodeTest {
      * @throws InterruptedException
      */
     @Test
-    public void testTelnetDecode() throws InterruptedException {
+    void testTelnetDecode() throws InterruptedException {
         ByteBuf telnetByteBuf = Unpooled.wrappedBuffer("test\r\n".getBytes());
 
         EmbeddedChannel ch = null;
@@ -157,7 +151,7 @@ public class DubboTelnetDecodeTest {
             },
                     new MultiMessageHandler(
                             new DecodeHandler(
-                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter() {
+                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter(FrameworkModel.defaultModel()) {
                                         @Override
                                         public CompletableFuture<Object> reply(ExchangeChannel channel, Object msg) {
                                             return getDefaultFuture();
@@ -203,7 +197,7 @@ public class DubboTelnetDecodeTest {
      * @throws InterruptedException
      */
     @Test
-    public void testTelnetDubboDecoded() throws InterruptedException, IOException {
+    void testTelnetDubboDecoded() throws InterruptedException, IOException {
         ByteBuf dubboByteBuf = createDubboByteBuf();
 
         ByteBuf telnetByteBuf = Unpooled.wrappedBuffer("test\r".getBytes());
@@ -220,7 +214,7 @@ public class DubboTelnetDecodeTest {
             },
                     new MultiMessageHandler(
                             new DecodeHandler(
-                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter() {
+                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter(FrameworkModel.defaultModel()) {
                                         @Override
                                         public CompletableFuture<Object> reply(ExchangeChannel channel, Object msg) {
                                             if (checkDubboDecoded(msg)) {
@@ -275,7 +269,7 @@ public class DubboTelnetDecodeTest {
      */
     @Disabled
     @Test
-    public void testTelnetTelnetDecoded() throws InterruptedException {
+    void testTelnetTelnetDecoded() throws InterruptedException {
         ByteBuf firstByteBuf = Unpooled.wrappedBuffer("ls\r".getBytes());
         ByteBuf secondByteBuf = Unpooled.wrappedBuffer("\nls\r\n".getBytes());
 
@@ -292,7 +286,7 @@ public class DubboTelnetDecodeTest {
             },
                     new MultiMessageHandler(
                             new DecodeHandler(
-                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter() {
+                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter(FrameworkModel.defaultModel()) {
                                         @Override
                                         public CompletableFuture<Object> reply(ExchangeChannel channel, Object msg) {
                                             return getDefaultFuture();
@@ -342,7 +336,7 @@ public class DubboTelnetDecodeTest {
      * @throws InterruptedException
      */
     @Test
-    public void testDubboDubboDecoded() throws InterruptedException, IOException {
+    void testDubboDubboDecoded() throws InterruptedException, IOException {
         ByteBuf dubboByteBuf = createDubboByteBuf();
 
         ByteBuf firstDubboByteBuf = dubboByteBuf.copy(0, 50);
@@ -359,7 +353,7 @@ public class DubboTelnetDecodeTest {
             MockHandler mockHandler = new MockHandler(null,
                     new MultiMessageHandler(
                             new DecodeHandler(
-                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter() {
+                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter(FrameworkModel.defaultModel()) {
                                         @Override
                                         public CompletableFuture<Object> reply(ExchangeChannel channel, Object msg) {
                                             if (checkDubboDecoded(msg)) {
@@ -409,7 +403,7 @@ public class DubboTelnetDecodeTest {
      * @throws InterruptedException
      */
     @Test
-    public void testDubboTelnetDecoded() throws InterruptedException, IOException {
+    void testDubboTelnetDecoded() throws InterruptedException, IOException {
         ByteBuf dubboByteBuf = createDubboByteBuf();
         ByteBuf firstDubboByteBuf = dubboByteBuf.copy(0, 50);
         ByteBuf secondLeftDubboByteBuf = dubboByteBuf.copy(50, dubboByteBuf.readableBytes());
@@ -430,7 +424,7 @@ public class DubboTelnetDecodeTest {
             },
                     new MultiMessageHandler(
                             new DecodeHandler(
-                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter() {
+                                    new HeaderExchangeHandler(new ExchangeHandlerAdapter(FrameworkModel.defaultModel()) {
                                         @Override
                                         public CompletableFuture<Object> reply(ExchangeChannel channel, Object msg) {
                                             if (checkDubboDecoded(msg)) {
@@ -481,6 +475,9 @@ public class DubboTelnetDecodeTest {
 
         // register
         // frameworkModel.getServiceRepository().registerProviderUrl();
+        FrameworkModel.defaultModel().getBeanFactory().getBean(PermittedSerializationKeeper.class)
+            .registerService(URL.valueOf("dubbo://127.0.0.1:20880/" + DemoService.class.getName() + "?version=0.0.0"));
+
 
         return dubboByteBuf;
     }

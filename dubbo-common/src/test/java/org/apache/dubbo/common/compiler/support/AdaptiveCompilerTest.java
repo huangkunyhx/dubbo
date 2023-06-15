@@ -21,15 +21,15 @@ import org.apache.dubbo.rpc.model.FrameworkModel;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class AdaptiveCompilerTest extends JavaCodeTest {
+class AdaptiveCompilerTest extends JavaCodeTest {
 
     @Test
-    public void testAvailableCompiler() throws Exception {
+    void testAvailableCompiler() throws Exception {
         AdaptiveCompiler.setDefaultCompiler("jdk");
         AdaptiveCompiler compiler = new AdaptiveCompiler();
         compiler.setFrameworkModel(FrameworkModel.defaultModel());
         Class<?> clazz = compiler.compile(JavaCodeTest.class, getSimpleCode(), AdaptiveCompiler.class.getClassLoader());
-        HelloService helloService = (HelloService) clazz.newInstance();
+        HelloService helloService = (HelloService) clazz.getDeclaredConstructor().newInstance();
         Assertions.assertEquals("Hello world!", helloService.sayHello());
     }
 

@@ -33,10 +33,11 @@ import java.util.List;
 import static org.apache.dubbo.registry.client.migration.DefaultMigrationAddressComparator.NEW_ADDRESS_SIZE;
 import static org.apache.dubbo.registry.client.migration.DefaultMigrationAddressComparator.OLD_ADDRESS_SIZE;
 
-public class DefaultMigrationAddressComparatorTest {
+class DefaultMigrationAddressComparatorTest {
 
+    @SuppressWarnings("all")
     @Test
-    public void test() {
+    void test() {
         DefaultMigrationAddressComparator comparator = new DefaultMigrationAddressComparator();
 
         ClusterInvoker newInvoker = Mockito.mock(ClusterInvoker.class);
@@ -69,13 +70,13 @@ public class DefaultMigrationAddressComparatorTest {
 
         Mockito.when(oldInvoker.hasProxyInvokers()).thenReturn(true);
 
-        List<Invoker> newInvokerList = new LinkedList<>();
+        List<Invoker<?>> newInvokerList = new LinkedList<>();
         newInvokerList.add(Mockito.mock(Invoker.class));
         newInvokerList.add(Mockito.mock(Invoker.class));
         newInvokerList.add(Mockito.mock(Invoker.class));
         Mockito.when(newDirectory.getAllInvokers()).thenReturn(newInvokerList);
 
-        List<Invoker> oldInvokerList = new LinkedList<>();
+        List<Invoker<?>> oldInvokerList = new LinkedList<>();
         oldInvokerList.add(Mockito.mock(Invoker.class));
         oldInvokerList.add(Mockito.mock(Invoker.class));
         Mockito.when(oldDirectory.getAllInvokers()).thenReturn(oldInvokerList);

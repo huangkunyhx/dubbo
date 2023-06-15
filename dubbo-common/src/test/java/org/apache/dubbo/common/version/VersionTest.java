@@ -22,15 +22,21 @@ import org.apache.dubbo.common.Version;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class VersionTest {
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URL;
+import java.util.Enumeration;
+
+class VersionTest {
 
     @Test
-    public void testGetProtocolVersion() {
+    void testGetProtocolVersion() {
         Assertions.assertEquals(Version.getProtocolVersion(), Version.DEFAULT_DUBBO_PROTOCOL_VERSION);
     }
 
     @Test
-    public void testSupportResponseAttachment() {
+    void testSupportResponseAttachment() {
         Assertions.assertTrue(Version.isSupportResponseAttachment("2.0.2"));
         Assertions.assertTrue(Version.isSupportResponseAttachment("2.0.3"));
         Assertions.assertTrue(Version.isSupportResponseAttachment("2.0.99"));
@@ -47,7 +53,7 @@ public class VersionTest {
     }
 
     @Test
-    public void testGetIntVersion() {
+    void testGetIntVersion() {
         Assertions.assertEquals(2060100, Version.getIntVersion("2.6.1"));
         Assertions.assertEquals(2060101, Version.getIntVersion("2.6.1.1"));
         Assertions.assertEquals(2070001, Version.getIntVersion("2.7.0.1"));
@@ -60,7 +66,7 @@ public class VersionTest {
     }
 
     @Test
-    public void testCompare() {
+    void testCompare() {
         Assertions.assertEquals(0, Version.compare("3.0.0", "3.0.0"));
         Assertions.assertEquals(0, Version.compare("3.0.0-SNAPSHOT", "3.0.0"));
         Assertions.assertEquals(1, Version.compare("3.0.0.1", "3.0.0"));
@@ -71,7 +77,7 @@ public class VersionTest {
     }
 
     @Test
-    public void testIsFramework270OrHigher() {
+    void testIsFramework270OrHigher() {
         Assertions.assertTrue(Version.isRelease270OrHigher("2.7.0"));
         Assertions.assertTrue(Version.isRelease270OrHigher("2.7.0.1"));
         Assertions.assertTrue(Version.isRelease270OrHigher("2.7.0.2"));
@@ -81,7 +87,7 @@ public class VersionTest {
     }
 
     @Test
-    public void testIsFramework263OrHigher() {
+    void testIsFramework263OrHigher() {
         Assertions.assertTrue(Version.isRelease263OrHigher("2.7.0"));
         Assertions.assertTrue(Version.isRelease263OrHigher("2.7.0.1"));
         Assertions.assertTrue(Version.isRelease263OrHigher("2.6.4"));
@@ -90,5 +96,65 @@ public class VersionTest {
         Assertions.assertFalse(Version.isRelease263OrHigher("2.6.1.1"));
         Assertions.assertTrue(Version.isRelease263OrHigher("2.6.3"));
         Assertions.assertTrue(Version.isRelease263OrHigher("2.6.3.0"));
+    }
+
+    @Test
+    void testGetVersion() throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        Class<?> versionClass = reloadVersionClass();
+        Assertions.assertEquals("1.0.0", versionClass.getDeclaredMethod("getVersion").invoke(null));
+    }
+
+    private static Class<?> reloadVersionClass() throws ClassNotFoundException {
+        ClassLoader originClassLoader = Thread.currentThread().getContextClassLoader();
+        ClassLoader classLoader = new ClassLoader(originClassLoader) {
+            @Override
+            public Class<?> loadClass(String name) throws ClassNotFoundException {
+                if (name.equals("org.apache.dubbo.common.Version")) {
+                    return findClass(name);
+                }
+                return super.loadClass(name);
+            }
+
+            @Override
+            protected Class<?> findClass(String name) throws ClassNotFoundException {
+                try {
+                    byte[] bytes = loadClassData(name);
+                    return defineClass(name, bytes, 0, bytes.length);
+                } catch (Exception e) {
+                    return getParent().loadClass(name);
+                }
+            }
+
+
+            public byte[] loadClassData(String className) throws IOException {
+                className = className.replaceAll("\\.", "/");
+                String path = Version.class.getProtectionDomain().getCodeSource().getLocation().getPath() + className + ".class";
+                FileInputStream fileInputStream;
+                byte[] classBytes;
+                fileInputStream = new FileInputStream(path);
+                int length = fileInputStream.available();
+                classBytes = new byte[length];
+                fileInputStream.read(classBytes);
+                fileInputStream.close();
+                return classBytes;
+            }
+
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+
+                if (name.equals("META-INF/versions/dubbo-common")) {
+                    return super.getResources("META-INF/test-versions/dubbo-common");
+                }
+                return super.getResources(name);
+            }
+        };
+        Class<?> versionClass = classLoader.loadClass("org.apache.dubbo.common.Version");
+        return versionClass;
+    }
+
+    @Test
+    void testGetLastCommitId() throws NoSuchMethodException, ClassNotFoundException, InvocationTargetException, IllegalAccessException {
+        Class<?> versionClass = reloadVersionClass();
+        Assertions.assertEquals("82a29fcd674216fe9bea10b6efef3196929dd7ca", versionClass.getDeclaredMethod("getLastCommitId").invoke(null));
     }
 }

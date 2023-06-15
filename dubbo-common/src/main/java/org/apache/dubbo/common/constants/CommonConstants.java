@@ -43,6 +43,10 @@ public interface CommonConstants {
 
     String METADATA_SERVICE_PROTOCOL_KEY = "metadata-service-protocol";
 
+    String METRICS_SERVICE_PORT_KEY = "metrics-service-port";
+
+    String METRICS_SERVICE_PROTOCOL_KEY = "metrics-service-protocol";
+
     String LIVENESS_PROBE_KEY = "liveness-probe";
 
     String READINESS_PROBE_KEY = "readiness-probe";
@@ -112,13 +116,15 @@ public interface CommonConstants {
 
     String EXECUTOR_SERVICE_COMPONENT_KEY = ExecutorService.class.getName();
 
-    String INTERNAL_EXECUTOR_SERVICE_COMPONENT_KEY = "INTERNAL_SERVICE_EXECUTOR";
+    String CONSUMER_SHARED_EXECUTOR_SERVICE_COMPONENT_KEY = "CONSUMER_SHARED_SERVICE_EXECUTOR";
 
     String THREADPOOL_KEY = "threadpool";
 
     String THREAD_NAME_KEY = "threadname";
 
     String CORE_THREADS_KEY = "corethreads";
+
+    String THREAD_POOL_EXHAUSTED_LISTENERS_KEY = "thread-pool-exhausted-listeners";
 
     String THREADS_KEY = "threads";
 
@@ -205,6 +211,8 @@ public interface CommonConstants {
 
     String PATH_KEY = "path";
 
+    String ADDRESS_KEY = "address";
+
     String INTERFACE_KEY = "interface";
 
     String FILE_KEY = "file";
@@ -212,6 +220,8 @@ public interface CommonConstants {
     String FILTER_KEY = "filter";
 
     String DUMP_DIRECTORY = "dump.directory";
+
+    String DUMP_ENABLE = "dump.enable";
 
     String CLASSIFIER_KEY = "classifier";
 
@@ -228,6 +238,10 @@ public interface CommonConstants {
     String DEFAULT_METADATA_STORAGE_TYPE = "local";
 
     String REMOTE_METADATA_STORAGE_TYPE = "remote";
+
+    String INTERFACE_REGISTER_MODE = "interface";
+
+    String DEFAULT_REGISTER_MODE = "all";
 
     String GENERIC_KEY = "generic";
 
@@ -265,6 +279,7 @@ public interface CommonConstants {
     int MAX_PROXY_COUNT = 65535;
 
     String MONITOR_KEY = "monitor";
+    String BACKGROUND_KEY = "background";
     String CLUSTER_KEY = "cluster";
     String USERNAME_KEY = "username";
     String PASSWORD_KEY = "password";
@@ -303,6 +318,7 @@ public interface CommonConstants {
     String HEARTBEAT_EVENT = null;
     String MOCK_HEARTBEAT_EVENT = "H";
     String READONLY_EVENT = "R";
+    String WRITEABLE_EVENT = "W";
 
     String REFERENCE_FILTER_KEY = "reference.filter";
 
@@ -355,8 +371,15 @@ public interface CommonConstants {
     /**
      * Whether to cache locally, default is true
      */
-    String REGISTRY_LOCAL_FILE_CACHE_ENABLED = "file.cache";
+    String REGISTRY_LOCAL_FILE_CACHE_ENABLED = "file-cache";
 
+    String METADATA_INFO_CACHE_EXPIRE_KEY = "metadata-info-cache.expire";
+
+    int DEFAULT_METADATA_INFO_CACHE_EXPIRE = 10 * 60 * 1000;
+
+    String METADATA_INFO_CACHE_SIZE_KEY = "metadata-info-cache.size";
+
+    int DEFAULT_METADATA_INFO_CACHE_SIZE = 16;
 
     /**
      * The limit of callback service instances for one interface on every client
@@ -417,6 +440,10 @@ public interface CommonConstants {
     String ENABLE_NATIVE_JAVA_GENERIC_SERIALIZE = "dubbo.security.serialize.generic.native-java-enable";
 
     String SERIALIZE_BLOCKED_LIST_FILE_PATH = "security/serialize.blockedlist";
+
+    String SERIALIZE_ALLOW_LIST_FILE_PATH = "security/serialize.allowlist";
+
+    String SERIALIZE_CHECK_STATUS_KEY = "dubbo.application.serialize-check-status";
 
     String QOS_LIVE_PROBE_EXTENSION = "dubbo.application.liveness-probe";
 
@@ -576,5 +603,40 @@ public interface CommonConstants {
      * @since 3.1.0
      */
     String UNLOAD_CLUSTER_RELATED = "unloadClusterRelated";
+
+    /**
+     * used for thread isolation between services
+     */
+    String SERVICE_EXECUTOR = "service-executor";
+    String EXECUTOR_MANAGEMENT_MODE = "executor-management-mode";
+    String EXECUTOR_MANAGEMENT_MODE_DEFAULT = "default";
+    String EXECUTOR_MANAGEMENT_MODE_ISOLATION = "isolation";
+
+
+    /**
+     *
+     * used in JVMUtil.java ,Control stack print lines, default is 32 lines
+     *
+     */
+    String DUBBO_JSTACK_MAXLINE = "dubbo.jstack-dump.max-line";
+
+
+    String ENCODE_IN_IO_THREAD_KEY = "encode.in.io";
+    boolean DEFAULT_ENCODE_IN_IO_THREAD = false;
+
+    /**
+     * @since 3.2.0
+     */
+    String BYTE_ACCESSOR_KEY = "byte.accessor";
+
+    String PAYLOAD = "payload";
+
+    String DUBBO_METRICS_CONFIGCENTER_ENABLE = "dubbo.metrics.configcenter.enable";
+
+    Integer TRI_EXCEPTION_CODE_NOT_EXISTS = 0;
+
+    String PACKABLE_METHOD_FACTORY_KEY = "serialize.packable.factory";
+
+    String DUBBO_PACKABLE_METHOD_FACTORY = "dubbo.application.parameters." + PACKABLE_METHOD_FACTORY_KEY;
 
 }

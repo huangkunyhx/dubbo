@@ -22,7 +22,7 @@ import org.apache.dubbo.common.deploy.ModuleDeployer;
 import org.apache.dubbo.common.extension.ExtensionLoader;
 import org.apache.dubbo.config.ApplicationConfig;
 import org.apache.dubbo.config.context.ConfigManager;
-import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.api.CommandContext;
 import org.apache.dubbo.qos.probe.StartupProbe;
 import org.apache.dubbo.qos.probe.impl.DeployerStartupProbe;
 import org.apache.dubbo.rpc.model.ApplicationModel;
@@ -38,7 +38,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-public class StartupTest {
+class StartupTest {
     private FrameworkModel frameworkModel;
     private ModuleDeployer moduleDeployer;
 
@@ -67,7 +67,7 @@ public class StartupTest {
     }
 
     @Test
-    public void testExecute() {
+    void testExecute() {
         Startup startup = new Startup(frameworkModel);
         CommandContext commandContext = new CommandContext("startup");
 

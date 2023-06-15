@@ -21,6 +21,7 @@ import org.apache.dubbo.common.utils.CollectionUtils;
 import org.apache.dubbo.rpc.FutureContext;
 
 import com.alibaba.dubbo.common.Constants;
+import com.alibaba.dubbo.common.DelegateURL;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.rpc.protocol.dubbo.FutureAdapter;
 
@@ -47,11 +48,24 @@ public class RpcContext {
     public static RpcContext getServerContext() {
         return new RpcContext(org.apache.dubbo.rpc.RpcContext.getServerContext());
     }
+    public static RpcContext getClientResponseContext() {
+        return new RpcContext(org.apache.dubbo.rpc.RpcContext.getClientResponseContext());
+    }
+
+    public static RpcContext getServerResponseContext() {
+        return new RpcContext(org.apache.dubbo.rpc.RpcContext.getServerResponseContext());
+    }
+    public static void removeClientResponseContext() {
+        org.apache.dubbo.rpc.RpcContext.removeClientResponseContext();
+    }
+
+    public static void removeServerResponseContext() {
+        org.apache.dubbo.rpc.RpcContext.removeServerResponseContext();
+    }
 
     public static void removeServerContext() {
         org.apache.dubbo.rpc.RpcContext.removeServerContext();
     }
-
     public static void removeContext() {
         org.apache.dubbo.rpc.RpcContext.removeContext();
     }
@@ -121,7 +135,7 @@ public class RpcContext {
         if (CollectionUtils.isNotEmpty(newUrls)) {
             List<URL> urls = new ArrayList<>(newUrls.size());
             for (org.apache.dubbo.common.URL newUrl : newUrls) {
-                urls.add(new URL(newUrl));
+                urls.add(new DelegateURL(newUrl));
             }
             return urls;
         }
@@ -139,7 +153,7 @@ public class RpcContext {
     }
 
     public URL getUrl() {
-        return new URL(newRpcContext.getUrl());
+        return new DelegateURL(newRpcContext.getUrl());
     }
 
     public void setUrl(URL url) {
@@ -290,6 +304,10 @@ public class RpcContext {
 
     public Object get(String key) {
         return newRpcContext.get(key);
+    }
+
+    public Invocation getInvocation() {
+        return new Invocation.CompatibleInvocation(newRpcContext.getInvocation());
     }
 
     @Deprecated

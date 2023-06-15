@@ -25,9 +25,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
-public class LogTest {
+class LogTest {
     @Test
-    public void testLogName() throws Exception {
+    void testLogName() {
         Log log1 = new Log();
         Log log2 = new Log();
         Log log3 = new Log();
@@ -41,7 +41,7 @@ public class LogTest {
     }
 
     @Test
-    public void testLogLevel() throws Exception {
+    void testLogLevel() {
         Log log1 = new Log();
         Log log2 = new Log();
         Log log3 = new Log();
@@ -55,7 +55,7 @@ public class LogTest {
     }
 
     @Test
-    public void testLogMessage() throws Exception {
+    void testLogMessage() {
         Log log1 = new Log();
         Log log2 = new Log();
         Log log3 = new Log();
@@ -69,7 +69,7 @@ public class LogTest {
     }
 
     @Test
-    public void testLogThread() throws Exception {
+    void testLogThread() {
         Log log1 = new Log();
         Log log2 = new Log();
         Log log3 = new Log();

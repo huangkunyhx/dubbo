@@ -71,8 +71,14 @@
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
+            <groupId>org.apache.dubbo</groupId>
+            <artifactId>dubbo-qos-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.dubbo</groupId>
+            <artifactId>dubbo-metrics-default</artifactId>
+            <version>${project.version}</version>
         </dependency>
     </dependencies>
 </project>

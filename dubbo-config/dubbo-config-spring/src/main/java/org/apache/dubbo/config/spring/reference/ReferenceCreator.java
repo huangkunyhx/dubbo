@@ -16,6 +16,8 @@
  */
 package org.apache.dubbo.config.spring.reference;
 
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.config.AbstractConfig;
 import org.apache.dubbo.config.ArgumentConfig;
 import org.apache.dubbo.config.ConsumerConfig;
@@ -27,13 +29,12 @@ import org.apache.dubbo.config.annotation.Argument;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.config.annotation.Method;
 import org.apache.dubbo.config.spring.beans.factory.annotation.AnnotationPropertyValuesAdapter;
+import org.apache.dubbo.config.spring.util.AnnotationUtils;
 import org.apache.dubbo.config.spring.util.DubboAnnotationUtils;
 import org.apache.dubbo.config.spring.util.DubboBeanUtils;
+import org.apache.dubbo.config.spring.util.ObjectUtils;
 import org.apache.dubbo.rpc.model.ModuleModel;
 
-import com.alibaba.spring.util.AnnotationUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.convert.support.DefaultConversionService;
@@ -43,9 +44,6 @@ import org.springframework.validation.DataBinder;
 
 import java.util.Map;
 
-import static com.alibaba.spring.util.AnnotationUtils.getAttribute;
-import static com.alibaba.spring.util.ObjectUtils.of;
-
 /**
  * {@link ReferenceConfig} Creator for @{@link DubboReference}
  *
@@ -54,7 +52,7 @@ import static com.alibaba.spring.util.ObjectUtils.of;
 public class ReferenceCreator {
 
     // Ignore those fields
-    static final String[] IGNORE_FIELD_NAMES = of("application", "module", "consumer", "monitor", "registry", "interfaceClass");
+    static final String[] IGNORE_FIELD_NAMES = ObjectUtils.of("application", "module", "consumer", "monitor", "registry", "interfaceClass");
 
     private static final String ONRETURN = "onreturn";
 
@@ -66,7 +64,7 @@ public class ReferenceCreator {
 
     private static final String METHOD = "Method";
 
-    protected final Log logger = LogFactory.getLog(getClass());
+    protected final Logger logger = LoggerFactory.getLogger(getClass());
 
     protected final Map<String, Object> attributes;
 
@@ -117,7 +115,7 @@ public class ReferenceCreator {
     }
 
     private void configureMonitorConfig(ReferenceConfig configBean) {
-        String monitorConfigId = getAttribute(attributes, "monitor");
+        String monitorConfigId = AnnotationUtils.getAttribute(attributes, "monitor");
         if (StringUtils.hasText(monitorConfigId)) {
             MonitorConfig monitorConfig = getConfig(monitorConfigId, MonitorConfig.class);
             configBean.setMonitor(monitorConfig);
@@ -125,7 +123,7 @@ public class ReferenceCreator {
     }
 
     private void configureModuleConfig(ReferenceConfig configBean) {
-        String moduleConfigId = getAttribute(attributes, "module");
+        String moduleConfigId = AnnotationUtils.getAttribute(attributes, "module");
         if (StringUtils.hasText(moduleConfigId)) {
             ModuleConfig moduleConfig = getConfig(moduleConfigId, ModuleConfig.class);
             configBean.setModule(moduleConfig);
@@ -134,7 +132,7 @@ public class ReferenceCreator {
 
     private void configureConsumerConfig(ReferenceConfig<?> referenceBean) {
         ConsumerConfig consumerConfig = null;
-        Object consumer = getAttribute(attributes, "consumer");
+        Object consumer = AnnotationUtils.getAttribute(attributes, "consumer");
         if (consumer != null) {
             if (consumer instanceof String) {
                 consumerConfig = getConfig((String) consumer, ConsumerConfig.class);

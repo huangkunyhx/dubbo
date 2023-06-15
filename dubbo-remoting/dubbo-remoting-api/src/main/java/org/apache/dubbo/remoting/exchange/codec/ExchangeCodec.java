@@ -20,7 +20,7 @@ import org.apache.dubbo.common.Version;
 import org.apache.dubbo.common.config.ConfigurationUtils;
 import org.apache.dubbo.common.io.Bytes;
 import org.apache.dubbo.common.io.StreamUtils;
-import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.serialize.Cleanable;
 import org.apache.dubbo.common.serialize.ObjectInput;
@@ -32,6 +32,7 @@ import org.apache.dubbo.remoting.RemotingException;
 import org.apache.dubbo.remoting.buffer.ChannelBuffer;
 import org.apache.dubbo.remoting.buffer.ChannelBufferInputStream;
 import org.apache.dubbo.remoting.buffer.ChannelBufferOutputStream;
+import org.apache.dubbo.remoting.exchange.HeartBeatRequest;
 import org.apache.dubbo.remoting.exchange.Request;
 import org.apache.dubbo.remoting.exchange.Response;
 import org.apache.dubbo.remoting.exchange.support.DefaultFuture;
@@ -42,6 +43,13 @@ import org.apache.dubbo.remoting.transport.ExceedPayloadLimitException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.PROTOCOL_TIMEOUT_SERVER;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.TRANSPORT_EXCEED_PAYLOAD_LIMIT;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.TRANSPORT_FAILED_RESPONSE;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.TRANSPORT_SKIP_UNUSED_STREAM;
 
 /**
  * ExchangeCodec.
@@ -59,7 +67,7 @@ public class ExchangeCodec extends TelnetCodec {
     protected static final byte FLAG_TWOWAY = (byte) 0x40;
     protected static final byte FLAG_EVENT = (byte) 0x20;
     protected static final int SERIALIZATION_MASK = 0x1f;
-    private static final Logger logger = LoggerFactory.getLogger(ExchangeCodec.class);
+    private static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(ExchangeCodec.class);
 
     public Short getMagicCode() {
         return MAGIC;
@@ -88,7 +96,7 @@ public class ExchangeCodec extends TelnetCodec {
     protected Object decode(Channel channel, ChannelBuffer buffer, int readable, byte[] header) throws IOException {
         // check magic number.
         if (readable > 0 && header[0] != MAGIC_HIGH
-                || readable > 1 && header[1] != MAGIC_LOW) {
+            || readable > 1 && header[1] != MAGIC_LOW) {
             int length = header.length;
             if (header.length < readable) {
                 header = Bytes.copyOf(header, readable);
@@ -132,11 +140,11 @@ public class ExchangeCodec extends TelnetCodec {
             if (is.available() > 0) {
                 try {
                     if (logger.isWarnEnabled()) {
-                        logger.warn("Skip input stream " + is.available());
+                        logger.warn(TRANSPORT_SKIP_UNUSED_STREAM, "", "", "Skip input stream " + is.available());
                     }
                     StreamUtils.skipUnusedStream(is);
                 } catch (IOException e) {
-                    logger.warn(e.getMessage(), e);
+                    logger.warn(TRANSPORT_SKIP_UNUSED_STREAM, "", "", e.getMessage(), e);
                 }
             }
         }
@@ -167,7 +175,7 @@ public class ExchangeCodec extends TelnetCodec {
                             data = decodeEventData(channel, CodecSupport.deserialize(channel.getUrl(), new ByteArrayInputStream(eventPayload), proto), eventPayload);
                         }
                     } else {
-                        data = decodeResponseData(channel, CodecSupport.deserialize(channel.getUrl(), is, proto), getRequestData(id));
+                        data = decodeResponseData(channel, CodecSupport.deserialize(channel.getUrl(), is, proto), getRequestData(channel, res, id));
                     }
                     res.setResult(data);
                 } else {
@@ -180,45 +188,53 @@ public class ExchangeCodec extends TelnetCodec {
             return res;
         } else {
             // decode request.
-            Request req = new Request(id);
-            req.setVersion(Version.getProtocolVersion());
-            req.setTwoWay((flag & FLAG_TWOWAY) != 0);
-            if ((flag & FLAG_EVENT) != 0) {
-                req.setEvent(true);
-            }
+            Request req;
             try {
                 Object data;
-                if (req.isEvent()) {
+                if ((flag & FLAG_EVENT) != 0) {
                     byte[] eventPayload = CodecSupport.getPayload(is);
                     if (CodecSupport.isHeartBeat(eventPayload, proto)) {
                         // heart beat response data is always null;
+                        req = new HeartBeatRequest(id);
+                        ((HeartBeatRequest) req).setProto(proto);
                         data = null;
                     } else {
+                        req = new Request(id);
                         data = decodeEventData(channel, CodecSupport.deserialize(channel.getUrl(), new ByteArrayInputStream(eventPayload), proto), eventPayload);
                     }
+                    req.setEvent(true);
                 } else {
+                    req = new Request(id);
                     data = decodeRequestData(channel, CodecSupport.deserialize(channel.getUrl(), is, proto));
                 }
                 req.setData(data);
             } catch (Throwable t) {
                 // bad request
+                req = new Request(id);
                 req.setBroken(true);
                 req.setData(t);
             }
+            req.setVersion(Version.getProtocolVersion());
+            req.setTwoWay((flag & FLAG_TWOWAY) != 0);
             return req;
         }
     }
 
-    protected Object getRequestData(long id) {
+    protected Object getRequestData(Channel channel, Response response, long id) {
         DefaultFuture future = DefaultFuture.getFuture(id);
-        if (future == null) {
-            return null;
+        if (future != null) {
+            Request req = future.getRequest();
+            if (req != null) {
+                return req.getData();
+            }
         }
-        Request req = future.getRequest();
-        if (req == null) {
-            return null;
-        }
-        return req.getData();
+
+        logger.warn(PROTOCOL_TIMEOUT_SERVER, "", "", "The timeout response finally returned at "
+            + (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
+            + ", response status is " + response.getStatus() + ", response id is " + response.getId()
+            + (channel == null ? "" : ", channel: " + channel.getLocalAddress()
+            + " -> " + channel.getRemoteAddress()) + ", please check provider side for detailed result.");
+        throw new IllegalArgumentException("Failed to find any request match the response, response id: " + id);
     }
 
     protected void encodeRequest(Channel channel, ChannelBuffer buffer, Request req) throws IOException {
@@ -265,7 +281,7 @@ public class ExchangeCodec extends TelnetCodec {
         bos.flush();
         bos.close();
         int len = bos.writtenBytes();
-        checkPayload(channel, len);
+        checkPayload(channel, req.getPayload(), len);
         Bytes.int2bytes(len, header, 12);
 
         // write
@@ -298,10 +314,10 @@ public class ExchangeCodec extends TelnetCodec {
 
             // encode response data or error message.
             if (status == Response.OK) {
-                if(res.isHeartbeat()){
+                if (res.isHeartbeat()) {
                     // heartbeat response data is always null
                     bos.write(CodecSupport.getNullBytesOf(serialization));
-                }else {
+                } else {
                     ObjectOutput out = serialization.serialize(channel.getUrl(), bos);
                     if (res.isEvent()) {
                         encodeEventData(channel, out, res.getResult());
@@ -341,23 +357,24 @@ public class ExchangeCodec extends TelnetCodec {
                 r.setStatus(Response.BAD_RESPONSE);
 
                 if (t instanceof ExceedPayloadLimitException) {
-                    logger.warn(t.getMessage(), t);
+                    logger.warn(TRANSPORT_EXCEED_PAYLOAD_LIMIT, "", "", t.getMessage(), t);
                     try {
                         r.setErrorMessage(t.getMessage());
+                        r.setStatus(Response.SERIALIZATION_ERROR);
                         channel.send(r);
                         return;
                     } catch (RemotingException e) {
-                        logger.warn("Failed to send bad_response info back: " + t.getMessage() + ", cause: " + e.getMessage(), e);
+                        logger.warn(TRANSPORT_FAILED_RESPONSE, "", "", "Failed to send bad_response info back: " + t.getMessage() + ", cause: " + e.getMessage(), e);
                     }
                 } else {
                     // FIXME log error message in Codec and handle in caught() of IoHanndler?
-                    logger.warn("Fail to encode response: " + res + ", send bad_response info instead, cause: " + t.getMessage(), t);
+                    logger.warn(TRANSPORT_FAILED_RESPONSE, "", "", "Fail to encode response: " + res + ", send bad_response info instead, cause: " + t.getMessage(), t);
                     try {
                         r.setErrorMessage("Failed to send response: " + res + ", cause: " + StringUtils.toString(t));
                         channel.send(r);
                         return;
                     } catch (RemotingException e) {
-                        logger.warn("Failed to send bad_response info back: " + res + ", cause: " + e.getMessage(), e);
+                        logger.warn(TRANSPORT_FAILED_RESPONSE, "", "", "Failed to send bad_response info back: " + res + ", cause: " + e.getMessage(), e);
                     }
                 }
             }
@@ -402,7 +419,7 @@ public class ExchangeCodec extends TelnetCodec {
     }
 
     private void encodeEventData(ObjectOutput out, Object data) throws IOException {
-        out.writeEvent(data);
+        out.writeEvent((String) data);
     }
 
     @Deprecated
@@ -427,7 +444,7 @@ public class ExchangeCodec extends TelnetCodec {
         try {
             if (eventBytes != null) {
                 int dataLen = eventBytes.length;
-                int threshold = ConfigurationUtils.getSystemConfiguration(channel.getUrl().getScopeModel()).getInt("deserialization.event.size", 50);
+                int threshold = ConfigurationUtils.getSystemConfiguration(channel.getUrl().getScopeModel()).getInt("deserialization.event.size", 15);
                 if (dataLen > threshold) {
                     throw new IllegalArgumentException("Event data too long, actual size " + threshold + ", threshold " + threshold + " rejected for security consideration.");
                 }
@@ -481,19 +498,19 @@ public class ExchangeCodec extends TelnetCodec {
     }
 
     private Object finishRespWhenOverPayload(Channel channel, long size, byte[] header) {
-        int payload = getPayload(channel);
-        boolean overPayload = isOverPayload(payload, size);
-        if (overPayload) {
-            long reqId = Bytes.bytes2long(header, 4);
-            byte flag = header[2];
-            if ((flag & FLAG_REQUEST) == 0) {
+        byte flag = header[2];
+        if ((flag & FLAG_REQUEST) == 0) {
+            int payload = getPayload(channel);
+            boolean overPayload = isOverPayload(payload, size);
+            if (overPayload) {
+                long reqId = Bytes.bytes2long(header, 4);
                 Response res = new Response(reqId);
                 if ((flag & FLAG_EVENT) != 0) {
                     res.setEvent(true);
                 }
                 res.setStatus(Response.CLIENT_ERROR);
                 String errorMsg = "Data length too large: " + size + ", max payload: " + payload + ", channel: " + channel;
-                logger.error(errorMsg);
+                logger.error(TRANSPORT_EXCEED_PAYLOAD_LIMIT, "", "", errorMsg);
                 res.setErrorMessage(errorMsg);
                 return res;
             }

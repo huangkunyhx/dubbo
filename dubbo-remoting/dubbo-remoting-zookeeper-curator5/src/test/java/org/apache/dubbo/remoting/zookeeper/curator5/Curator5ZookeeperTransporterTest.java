@@ -27,7 +27,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.IsNot.not;
 import static org.hamcrest.core.IsNull.nullValue;
 
-public class Curator5ZookeeperTransporterTest {
+class Curator5ZookeeperTransporterTest {
     private ZookeeperClient zookeeperClient;
     private Curator5ZookeeperTransporter curatorZookeeperTransporter;
     private static String zookeeperConnectionAddress1;
@@ -38,13 +38,13 @@ public class Curator5ZookeeperTransporterTest {
     }
 
     @BeforeEach
-    public void setUp() throws Exception {
+    public void setUp() {
         zookeeperClient = new Curator5ZookeeperTransporter().connect(URL.valueOf(zookeeperConnectionAddress1 + "/service"));
         curatorZookeeperTransporter = new Curator5ZookeeperTransporter();
     }
 
     @Test
-    public void testZookeeperClient() {
+    void testZookeeperClient() {
         assertThat(zookeeperClient, not(nullValue()));
         zookeeperClient.close();
     }

@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
-public class MetaCacheManagerTest {
+class MetaCacheManagerTest {
 
     @BeforeEach
     public void setup() throws URISyntaxException {
@@ -50,7 +50,7 @@ public class MetaCacheManagerTest {
     }
 
     @Test
-    public void testCache() {
+    void testCache() {
 //        ScheduledExecutorService cacheRefreshExecutor = Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory("Dubbo-cache-refresh"));
 //        ExecutorRepository executorRepository = Mockito.mock(ExecutorRepository.class);
 //        when(executorRepository.getCacheRefreshExecutor()).thenReturn(cacheRefreshExecutor);
@@ -68,7 +68,7 @@ public class MetaCacheManagerTest {
             assertNull(metadataInfo);
 
             Map<String, MetadataInfo> newMetadatas = new HashMap<>();
-            MetadataInfo metadataInfo2 = JsonUtils.getJson().toJavaObject("{\"app\":\"demo2\",\"services\":{\"greeting/org.apache.dubbo.registry.service.DemoService2:1.0.0:dubbo\":{\"name\":\"org.apache.dubbo.registry.service.DemoService2\",\"group\":\"greeting\",\"version\":\"1.0.0\",\"protocol\":\"dubbo\",\"path\":\"org.apache.dubbo.registry.service.DemoService2\",\"params\":{\"application\":\"demo-provider2\",\"sayHello.timeout\":\"7000\",\"version\":\"1.0.0\",\"timeout\":\"5000\",\"group\":\"greeting\"}},\"greeting/org.apache.dubbo.registry.service.DemoService:1.0.0:dubbo\":{\"name\":\"org.apache.dubbo.registry.service.DemoService\",\"group\":\"greeting\",\"version\":\"1.0.0\",\"protocol\":\"dubbo\",\"path\":\"org.apache.dubbo.registry.service.DemoService\",\"params\":{\"application\":\"demo-provider2\",\"version\":\"1.0.0\",\"timeout\":\"5000\",\"group\":\"greeting\"}}}}\n", MetadataInfo.class);
+            MetadataInfo metadataInfo2 = JsonUtils.toJavaObject("{\"app\":\"demo2\",\"services\":{\"greeting/org.apache.dubbo.registry.service.DemoService2:1.0.0:dubbo\":{\"name\":\"org.apache.dubbo.registry.service.DemoService2\",\"group\":\"greeting\",\"version\":\"1.0.0\",\"protocol\":\"dubbo\",\"path\":\"org.apache.dubbo.registry.service.DemoService2\",\"params\":{\"application\":\"demo-provider2\",\"sayHello.timeout\":\"7000\",\"version\":\"1.0.0\",\"timeout\":\"5000\",\"group\":\"greeting\"}},\"greeting/org.apache.dubbo.registry.service.DemoService:1.0.0:dubbo\":{\"name\":\"org.apache.dubbo.registry.service.DemoService\",\"group\":\"greeting\",\"version\":\"1.0.0\",\"protocol\":\"dubbo\",\"path\":\"org.apache.dubbo.registry.service.DemoService\",\"params\":{\"application\":\"demo-provider2\",\"version\":\"1.0.0\",\"timeout\":\"5000\",\"group\":\"greeting\"}}}}\n", MetadataInfo.class);
             newMetadatas.put("2", metadataInfo2);
 
             cacheManager.update(newMetadatas);
@@ -85,9 +85,9 @@ public class MetaCacheManagerTest {
 
 
     @Test
-    public void testCacheDump() {
+    void testCacheDump() {
         System.setProperty("dubbo.meta.cache.fileName", "not-exist.dubbo.cache");
-        MetadataInfo metadataInfo3 = JsonUtils.getJson().toJavaObject("{\"app\":\"demo3\",\"services\":{\"greeting/org.apache.dubbo.registry.service.DemoService2:1.0.0:dubbo\":{\"name\":\"org.apache.dubbo.registry.service.DemoService2\",\"group\":\"greeting\",\"version\":\"1.0.0\",\"protocol\":\"dubbo\",\"path\":\"org.apache.dubbo.registry.service.DemoService2\",\"params\":{\"application\":\"demo-provider2\",\"sayHello.timeout\":\"7000\",\"version\":\"1.0.0\",\"timeout\":\"5000\",\"group\":\"greeting\"}},\"greeting/org.apache.dubbo.registry.service.DemoService:1.0.0:dubbo\":{\"name\":\"org.apache.dubbo.registry.service.DemoService\",\"group\":\"greeting\",\"version\":\"1.0.0\",\"protocol\":\"dubbo\",\"path\":\"org.apache.dubbo.registry.service.DemoService\",\"params\":{\"application\":\"demo-provider2\",\"version\":\"1.0.0\",\"timeout\":\"5000\",\"group\":\"greeting\"}}}}\n", MetadataInfo.class);
+        MetadataInfo metadataInfo3 = JsonUtils.toJavaObject("{\"app\":\"demo3\",\"services\":{\"greeting/org.apache.dubbo.registry.service.DemoService2:1.0.0:dubbo\":{\"name\":\"org.apache.dubbo.registry.service.DemoService2\",\"group\":\"greeting\",\"version\":\"1.0.0\",\"protocol\":\"dubbo\",\"path\":\"org.apache.dubbo.registry.service.DemoService2\",\"params\":{\"application\":\"demo-provider2\",\"sayHello.timeout\":\"7000\",\"version\":\"1.0.0\",\"timeout\":\"5000\",\"group\":\"greeting\"}},\"greeting/org.apache.dubbo.registry.service.DemoService:1.0.0:dubbo\":{\"name\":\"org.apache.dubbo.registry.service.DemoService\",\"group\":\"greeting\",\"version\":\"1.0.0\",\"protocol\":\"dubbo\",\"path\":\"org.apache.dubbo.registry.service.DemoService\",\"params\":{\"application\":\"demo-provider2\",\"version\":\"1.0.0\",\"timeout\":\"5000\",\"group\":\"greeting\"}}}}\n", MetadataInfo.class);
         MetaCacheManager cacheManager = new MetaCacheManager();
         try {
             cacheManager.put("3", metadataInfo3);

@@ -32,6 +32,7 @@ import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Result;
 import org.apache.dubbo.rpc.RpcContext;
 import org.apache.dubbo.rpc.RpcException;
+import org.apache.dubbo.rpc.RpcServiceContext;
 import org.apache.dubbo.rpc.cluster.ClusterInvoker;
 import org.apache.dubbo.rpc.cluster.Directory;
 import org.apache.dubbo.rpc.cluster.LoadBalance;
@@ -70,7 +71,7 @@ public abstract class AbstractClusterInvoker<T> implements ClusterInvoker<T> {
 
     private volatile boolean enableConnectivityValidation = true;
 
-    private AtomicBoolean destroyed = new AtomicBoolean(false);
+    private final AtomicBoolean destroyed = new AtomicBoolean(false);
 
     private volatile Invoker<T> stickyInvoker = null;
 
@@ -333,6 +334,8 @@ public abstract class AbstractClusterInvoker<T> implements ClusterInvoker<T> {
         List<Invoker<T>> invokers = list(invocation);
         InvocationProfilerUtils.releaseDetailProfiler(invocation);
 
+        checkInvokers(invokers, invocation);
+
         LoadBalance loadbalance = initLoadBalance(invokers, invocation);
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
 
@@ -370,15 +373,16 @@ public abstract class AbstractClusterInvoker<T> implements ClusterInvoker<T> {
     }
 
     protected Result invokeWithContext(Invoker<T> invoker, Invocation invocation) {
-        setContext(invoker);
+        Invoker<T> originInvoker = setContext(invoker);
         Result result;
         try {
             if (ProfilerSwitch.isEnableSimpleProfiler()) {
                 InvocationProfilerUtils.enterProfiler(invocation, "Invoker invoke. Target Address: " + invoker.getUrl().getAddress());
             }
+            invocation.addInvokedInvoker(invoker);
             result = invoker.invoke(invocation);
         } finally {
-            clearContext(invoker);
+            clearContext(originInvoker);
             InvocationProfilerUtils.releaseSimpleProfiler(invocation);
         }
         return result;
@@ -391,12 +395,12 @@ public abstract class AbstractClusterInvoker<T> implements ClusterInvoker<T> {
      * @return
      */
     protected Result invokeWithContextAsync(Invoker<T> invoker, Invocation invocation, URL consumerUrl) {
-        setContext(invoker, consumerUrl);
+        Invoker<T> originInvoker = setContext(invoker, consumerUrl);
         Result result;
         try {
             result = invoker.invoke(invocation);
         } finally {
-            clearContext(invoker);
+            clearContext(originInvoker);
         }
         return result;
     }
@@ -433,19 +437,21 @@ public abstract class AbstractClusterInvoker<T> implements ClusterInvoker<T> {
     }
 
 
-    private void setContext(Invoker<T> invoker) {
-        setContext(invoker, null);
+    private Invoker<T> setContext(Invoker<T> invoker) {
+        return setContext(invoker, null);
     }
 
-    private void setContext(Invoker<T> invoker, URL consumerUrl) {
-        RpcContext context = RpcContext.getServiceContext();
+    private Invoker<T> setContext(Invoker<T> invoker, URL consumerUrl) {
+        RpcServiceContext context = RpcContext.getServiceContext();
+        Invoker<?> originInvoker = context.getInvoker();
         context.setInvoker(invoker)
             .setConsumerUrl(null != consumerUrl ? consumerUrl : RpcContext.getServiceContext().getConsumerUrl());
+        return (Invoker<T>) originInvoker;
     }
 
     private void clearContext(Invoker<T> invoker) {
         // do nothing
         RpcContext context = RpcContext.getServiceContext();
-        context.setInvoker(null);
+        context.setInvoker(invoker);
     }
 }

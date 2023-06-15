@@ -58,6 +58,8 @@ public class RpcServiceContext extends RpcContext {
 
     private String remoteApplicationName;
 
+    private Boolean localInvoke;
+
     @Deprecated
     private List<Invoker<?>> invokers;
     @Deprecated
@@ -186,6 +188,9 @@ public class RpcServiceContext extends RpcContext {
     @Override
     public void setUrls(List<URL> urls) {
         this.urls = urls;
+        if (!urls.isEmpty()) {
+            this.url = urls.get(0);
+        }
     }
 
     @Override
@@ -613,6 +618,15 @@ public class RpcServiceContext extends RpcContext {
 
     public void setNeedPrintRouterSnapshot(boolean needPrintRouterSnapshot) {
         this.needPrintRouterSnapshot = needPrintRouterSnapshot;
+    }
+
+    public RpcServiceContext setLocalInvoke(boolean localInvoke) {
+        this.localInvoke = localInvoke;
+        return this;
+    }
+
+    public Boolean getLocalInvoke() {
+        return this.localInvoke;
     }
 
     /**

@@ -18,6 +18,7 @@
 package org.apache.dubbo.qos.command;
 
 import io.netty.channel.Channel;
+import org.apache.dubbo.qos.api.CommandContext;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -28,9 +29,9 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class CommandContextTest {
+class CommandContextTest {
     @Test
-    public void test() throws Exception {
+    void test() {
         CommandContext context = new CommandContext("test", new String[]{"hello"}, true);
         Object request = new Object();
         context.setOriginRequest(request);

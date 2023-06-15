@@ -22,7 +22,7 @@ import org.apache.dubbo.common.deploy.ModuleDeployer;
 import org.apache.dubbo.common.extension.ExtensionLoader;
 import org.apache.dubbo.config.ApplicationConfig;
 import org.apache.dubbo.config.context.ConfigManager;
-import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.api.CommandContext;
 import org.apache.dubbo.qos.probe.ReadinessProbe;
 import org.apache.dubbo.qos.probe.impl.DeployerReadinessProbe;
 import org.apache.dubbo.qos.probe.impl.ProviderReadinessProbe;
@@ -41,7 +41,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-public class ReadyTest {
+class ReadyTest {
 
     private FrameworkModel frameworkModel;
     private ModuleDeployer moduleDeployer;
@@ -76,7 +76,7 @@ public class ReadyTest {
     }
 
     @Test
-    public void testExecute() {
+    void testExecute() {
         Ready ready = new Ready(frameworkModel);
         CommandContext commandContext = new CommandContext("ready");
 

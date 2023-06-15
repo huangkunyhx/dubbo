@@ -18,7 +18,7 @@ package org.apache.dubbo.validation.support.jvalidation;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.bytecode.ClassGenerator;
-import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.utils.ReflectUtils;
 import org.apache.dubbo.validation.MethodValidated;
@@ -28,7 +28,6 @@ import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
-import jakarta.validation.ValidationException;
 import jakarta.validation.ValidatorFactory;
 import jakarta.validation.groups.Default;
 import javassist.ClassPool;
@@ -67,6 +66,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_FILTER_VALIDATION_EXCEPTION;
+
 /**
  * Implementation of JValidationNew. JValidationNew is invoked if configuration validation attribute value is 'jvalidationNew'.
  * <pre>
@@ -75,11 +76,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class JValidatorNew implements Validator {
 
-    private static final Logger logger = LoggerFactory.getLogger(JValidatorNew.class);
+    private static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(JValidatorNew.class);
 
     private final Class<?> clazz;
 
-    private final Map<String, Class> methodClassMap;
+    private final Map<String, Class<?>> methodClassMap;
 
     private final jakarta.validation.Validator validator;
 
@@ -109,14 +110,14 @@ public class JValidatorNew implements Validator {
             } catch (ClassNotFoundException e) {
                 parameterClass = generateMethodParameterClass(clazz, method, parameterClassName);
             }
-            Object parameterBean = parameterClass.newInstance();
+            Object parameterBean = parameterClass.getDeclaredConstructor().newInstance();
             for (int i = 0; i < args.length; i++) {
                 Field field = parameterClass.getField(method.getName() + "Argument" + i);
                 field.set(parameterBean, args[i]);
             }
             return parameterBean;
         } catch (Throwable e) {
-            logger.warn(e.getMessage(), e);
+            logger.warn(CONFIG_FILTER_VALIDATION_EXCEPTION, "", "", e.getMessage(), e);
             return null;
         }
     }
@@ -124,8 +125,8 @@ public class JValidatorNew implements Validator {
     /**
      * try to generate methodParameterClass.
      *
-     * @param clazz interface class
-     * @param method invoke method
+     * @param clazz              interface class
+     * @param method             invoke method
      * @param parameterClassName generated parameterClassName
      * @return Class<?> generated methodParameterClass
      * @throws Exception
@@ -186,9 +187,9 @@ public class JValidatorNew implements Validator {
 
     private static String generateMethodParameterClassName(Class<?> clazz, Method method) {
         StringBuilder builder = new StringBuilder().append(clazz.getName())
-                .append('_')
-                .append(toUpperMethoName(method.getName()))
-                .append("Parameter");
+            .append('_')
+            .append(toUpperMethoName(method.getName()))
+            .append("Parameter");
 
         Class<?>[] parameterTypes = method.getParameterTypes();
         for (Class<?> parameterType : parameterTypes) {
@@ -200,7 +201,7 @@ public class JValidatorNew implements Validator {
 
     private static boolean hasConstraintParameter(Method method) {
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-        if (parameterAnnotations != null && parameterAnnotations.length > 0) {
+        if (parameterAnnotations.length > 0) {
             for (Annotation[] annotations : parameterAnnotations) {
                 for (Annotation annotation : annotations) {
                     if (annotation.annotationType().isAnnotationPresent(Constraint.class)) {
@@ -257,49 +258,44 @@ public class JValidatorNew implements Validator {
 
     @Override
     public void validate(String methodName, Class<?>[] parameterTypes, Object[] arguments) throws Exception {
-        try {
-            List<Class<?>> groups = new ArrayList<>();
-            Class<?> methodClass = methodClass(methodName);
-            if (methodClass != null) {
-                groups.add(methodClass);
-            }
-            Set<ConstraintViolation<?>> violations = new HashSet<>();
-            Method method = clazz.getMethod(methodName, parameterTypes);
-            Class<?>[] methodClasses;
-            if (method.isAnnotationPresent(MethodValidated.class)){
-                methodClasses = method.getAnnotation(MethodValidated.class).value();
-                groups.addAll(Arrays.asList(methodClasses));
-            }
-            // add into default group
-            groups.add(0, Default.class);
-            groups.add(1, clazz);
+        List<Class<?>> groups = new ArrayList<>();
+        Class<?> methodClass = methodClass(methodName);
+        if (methodClass != null) {
+            groups.add(methodClass);
+        }
+        Set<ConstraintViolation<?>> violations = new HashSet<>();
+        Method method = clazz.getMethod(methodName, parameterTypes);
+        Class<?>[] methodClasses;
+        if (method.isAnnotationPresent(MethodValidated.class)) {
+            methodClasses = method.getAnnotation(MethodValidated.class).value();
+            groups.addAll(Arrays.asList(methodClasses));
+        }
+        // add into default group
+        groups.add(0, Default.class);
+        groups.add(1, clazz);
 
-            // convert list to array
-            Class<?>[] classgroups = groups.toArray(new Class[groups.size()]);
+        // convert list to array
+        Class<?>[] classgroups = groups.toArray(new Class[groups.size()]);
 
-            Object parameterBean = getMethodParameterBean(clazz, method, arguments);
-            if (parameterBean != null) {
-                violations.addAll(validator.validate(parameterBean, classgroups ));
-            }
+        Object parameterBean = getMethodParameterBean(clazz, method, arguments);
+        if (parameterBean != null) {
+            violations.addAll(validator.validate(parameterBean, classgroups));
+        }
 
-            for (Object arg : arguments) {
-                validate(violations, arg, classgroups);
-            }
+        for (Object arg : arguments) {
+            validate(violations, arg, classgroups);
+        }
 
-            if (!violations.isEmpty()) {
-                logger.info("Failed to validate service: " + clazz.getName() + ", method: " + methodName + ", cause: " + violations);
-                throw new ConstraintViolationException("Failed to validate service: " + clazz.getName() + ", method: " + methodName + ", cause: " + violations, violations);
-            }
-        } catch (ValidationException e) {
-            // only use exception's message to avoid potential serialization issue
-            throw new ValidationException(e.getMessage());
+        if (!violations.isEmpty()) {
+            logger.info("Failed to validate service: " + clazz.getName() + ", method: " + methodName + ", cause: " + violations);
+            throw new ConstraintViolationException("Failed to validate service: " + clazz.getName() + ", method: " + methodName + ", cause: " + violations, violations);
         }
     }
 
-    private Class methodClass(String methodName) {
+    private Class<?> methodClass(String methodName) {
         Class<?> methodClass = null;
         String methodClassName = clazz.getName() + "$" + toUpperMethoName(methodName);
-        Class cached = methodClassMap.get(methodClassName);
+        Class<?> cached = methodClassMap.get(methodClassName);
         if (cached != null) {
             return cached == clazz ? null : cached;
         }

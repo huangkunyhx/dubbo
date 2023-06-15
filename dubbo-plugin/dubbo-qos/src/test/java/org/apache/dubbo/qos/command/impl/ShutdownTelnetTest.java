@@ -16,8 +16,8 @@
  */
 package org.apache.dubbo.qos.command.impl;
 
-import org.apache.dubbo.qos.command.BaseCommand;
-import org.apache.dubbo.qos.command.CommandContext;
+import org.apache.dubbo.qos.api.BaseCommand;
+import org.apache.dubbo.qos.api.CommandContext;
 import org.apache.dubbo.remoting.RemotingException;
 import org.apache.dubbo.rpc.model.FrameworkModel;
 
@@ -31,7 +31,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 
-public class ShutdownTelnetTest {
+class ShutdownTelnetTest {
 
     private BaseCommand shutdown;
     private Channel mockChannel;
@@ -52,13 +52,13 @@ public class ShutdownTelnetTest {
     }
 
     @Test
-    public void testInvoke() throws RemotingException {
+    void testInvoke() throws RemotingException {
         String result = shutdown.execute(mockCommandContext, new String[0]);
         assertTrue(result.contains("Application has shutdown successfully"));
     }
 
     @Test
-    public void testInvokeWithTimeParameter() throws RemotingException {
+    void testInvokeWithTimeParameter() throws RemotingException {
         int sleepTime = 2000;
         long start = System.currentTimeMillis();
         String result = shutdown.execute(mockCommandContext, new String[]{"-t", "" + sleepTime});

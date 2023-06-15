@@ -20,6 +20,7 @@ import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.utils.CollectionUtils;
 import org.apache.dubbo.common.utils.StringUtils;
 import org.apache.dubbo.config.annotation.Service;
+import org.apache.dubbo.config.context.ConfigMode;
 import org.apache.dubbo.config.support.Parameter;
 import org.apache.dubbo.rpc.model.ModuleModel;
 import org.apache.dubbo.rpc.model.ScopeModel;
@@ -27,6 +28,7 @@ import org.apache.dubbo.rpc.model.ServiceMetadata;
 import org.apache.dubbo.rpc.service.GenericService;
 import org.apache.dubbo.rpc.support.ProtocolUtils;
 
+import java.beans.Transient;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -49,7 +51,6 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
     private static final long serialVersionUID = 3033787999037024738L;
 
 
-
     /**
      * The interface class of the exported service
      */
@@ -58,7 +59,7 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
     /**
      * The reference of the interface implementation
      */
-    protected T ref;
+    protected transient T ref;
 
     /**
      * The service name
@@ -110,8 +111,8 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
     @Override
     protected void postProcessAfterScopeModelChanged(ScopeModel oldScopeModel, ScopeModel newScopeModel) {
         super.postProcessAfterScopeModelChanged(oldScopeModel, newScopeModel);
-        if (this.provider != null && this.provider.getScopeModel() != scopeModel) {
-            this.provider.setScopeModel(scopeModel);
+        if (this.provider != null && this.provider.getScopeModel() != getScopeModel()) {
+            this.provider.setScopeModel(getScopeModel());
         }
     }
 
@@ -171,9 +172,11 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
         convertProviderIdToProvider();
         if (provider == null) {
             provider = getModuleConfigManager()
-                    .getDefaultProvider()
-                    .orElseThrow(() -> new IllegalStateException("Default provider is not initialized"));
+                .getDefaultProvider()
+                .orElseThrow(() -> new IllegalStateException("Default provider is not initialized"));
         }
+        // try set properties from `dubbo.service` if not set in current config
+        refreshWithPrefixes(super.getPrefixes(), ConfigMode.OVERRIDE_IF_ABSENT);
     }
 
     @Override
@@ -224,7 +227,7 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
     protected void convertProviderIdToProvider() {
         if (provider == null && StringUtils.hasText(providerIds)) {
             provider = getModuleConfigManager().getProvider(providerIds)
-                    .orElseThrow(() -> new IllegalStateException("Provider config not found: " + providerIds));
+                .orElseThrow(() -> new IllegalStateException("Provider config not found: " + providerIds));
         }
     }
 
@@ -246,7 +249,7 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
                 if (globalProtocol.isPresent()) {
                     tmpProtocols.add(globalProtocol.get());
                 } else {
-                    throw new IllegalStateException("Protocol not found: "+id);
+                    throw new IllegalStateException("Protocol not found: " + id);
                 }
             }
             setProtocols(tmpProtocols);
@@ -263,7 +266,7 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
         try {
             if (StringUtils.isNotEmpty(interfaceName)) {
                 this.interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
-                        .getContextClassLoader());
+                    .getContextClassLoader());
             }
         } catch (ClassNotFoundException t) {
             throw new IllegalStateException(t.getMessage(), t);
@@ -281,9 +284,9 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
     }
 
 
-
     public void setInterface(Class<?> interfaceClass) {
-        if (interfaceClass != null && !interfaceClass.isInterface()) {
+        // rest protocol  allow  set impl class
+        if (interfaceClass != null && !interfaceClass.isInterface() && !canSkipInterfaceCheck()) {
             throw new IllegalStateException("The interface class " + interfaceClass + " is not a interface!");
         }
         this.interfaceClass = interfaceClass;
@@ -293,6 +296,24 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
         }
     }
 
+    @Override
+    public boolean canSkipInterfaceCheck() {
+        // for multipart protocol so for each contain
+        List<ProtocolConfig> protocols = getProtocols();
+
+        if (protocols == null) {
+            return false;
+        }
+
+        for (ProtocolConfig protocol : protocols) {
+            if (Constants.REST_PROTOCOL.equals(protocol.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Transient
     public T getRef() {
         return ref;
     }
@@ -343,11 +364,13 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
         }
     }
 
+    @Transient
     public ServiceMetadata getServiceMetadata() {
         return serviceMetadata;
     }
 
     @Override
+    @Transient
     @Parameter(excluded = true, attribute = false)
     public List<String> getPrefixes() {
         List<String> prefixes = new ArrayList<>();
@@ -392,7 +415,9 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
     /**
      * export service and auto start application instance
      */
-    public abstract void export();
+    public final void export() {
+        export(true);
+    }
 
     public abstract void unexport();
 
@@ -400,4 +425,7 @@ public abstract class ServiceConfigBase<T> extends AbstractServiceConfig {
 
     public abstract boolean isUnexported();
 
+    public abstract void export(boolean register);
+
+    public abstract void register();
 }

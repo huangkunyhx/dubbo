@@ -16,8 +16,10 @@
  */
 package org.apache.dubbo.config.spring.beans.factory.annotation;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ArrayUtils;
 import org.apache.dubbo.common.utils.Assert;
 import org.apache.dubbo.common.utils.ClassUtils;
 import org.apache.dubbo.common.utils.StringUtils;
@@ -29,8 +31,10 @@ import org.apache.dubbo.config.spring.context.event.DubboConfigInitEvent;
 import org.apache.dubbo.config.spring.reference.ReferenceAttributes;
 import org.apache.dubbo.config.spring.reference.ReferenceBeanManager;
 import org.apache.dubbo.config.spring.reference.ReferenceBeanSupport;
+import org.apache.dubbo.config.spring.util.AnnotationUtils;
 import org.apache.dubbo.config.spring.util.SpringCompatUtils;
 import org.apache.dubbo.rpc.service.GenericService;
+
 import org.springframework.beans.BeansException;
 import org.springframework.beans.PropertyValue;
 import org.springframework.beans.PropertyValues;
@@ -63,7 +67,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import static com.alibaba.spring.util.AnnotationUtils.getAttribute;
+import static org.apache.dubbo.common.constants.LoggerCodeConstants.CONFIG_DUBBO_BEAN_INITIALIZER;
 import static org.apache.dubbo.common.utils.AnnotationUtils.filterDefaultValues;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -86,7 +90,7 @@ import static org.springframework.util.StringUtils.hasText;
  * @since 2.5.7
  */
 public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBeanPostProcessor
-        implements ApplicationContextAware, BeanFactoryPostProcessor {
+    implements ApplicationContextAware, BeanFactoryPostProcessor {
 
     /**
      * The bean name of {@link ReferenceAnnotationBeanPostProcessor}
@@ -98,13 +102,13 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
      */
     private static final int CACHE_SIZE = Integer.getInteger(BEAN_NAME + ".cache.size", 32);
 
-    private final Log logger = LogFactory.getLog(getClass());
+    private final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(getClass());
 
     private final ConcurrentMap<InjectionMetadata.InjectedElement, String> injectedFieldReferenceBeanCache =
-            new ConcurrentHashMap<>(CACHE_SIZE);
+        new ConcurrentHashMap<>(CACHE_SIZE);
 
     private final ConcurrentMap<InjectionMetadata.InjectedElement, String> injectedMethodReferenceBeanCache =
-            new ConcurrentHashMap<>(CACHE_SIZE);
+        new ConcurrentHashMap<>(CACHE_SIZE);
 
     private ApplicationContext applicationContext;
 
@@ -126,7 +130,7 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
         String[] beanNames = beanFactory.getBeanDefinitionNames();
         for (String beanName : beanNames) {
             Class<?> beanType;
-            if (beanFactory.isFactoryBean(beanName)){
+            if (beanFactory.isFactoryBean(beanName)) {
                 BeanDefinition beanDefinition = beanFactory.getBeanDefinition(beanName);
                 if (isReferenceBean(beanDefinition)) {
                     continue;
@@ -171,7 +175,7 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
             applicationContext.publishEvent(new DubboConfigInitEvent(applicationContext));
         } catch (Exception e) {
             // if spring version is less than 4.2, it does not support early application event
-            logger.warn("publish early application event failed, please upgrade spring version to 4.2.x or later: " + e);
+            logger.warn(CONFIG_DUBBO_BEAN_INITIALIZER, "", "", "publish early application event failed, please upgrade spring version to 4.2.x or later: " + e);
         }
     }
 
@@ -203,6 +207,7 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
      *
      * }
      * </pre>
+     *
      * @param beanName
      * @param beanDefinition
      */
@@ -306,10 +311,24 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
         }
     }
 
-    @Override
+    /**
+     * Alternatives to the {@link #postProcessProperties(PropertyValues, Object, String)}, that removed as of Spring
+     * Framework 6.0.0, and in favor of {@link #postProcessProperties(PropertyValues, Object, String)}.
+     * <p>In order to be compatible with the lower version of Spring, it is still retained.
+     * @see #postProcessProperties
+     */
     public PropertyValues postProcessPropertyValues(
-            PropertyValues pvs, PropertyDescriptor[] pds, Object bean, String beanName) throws BeansException {
+        PropertyValues pvs, PropertyDescriptor[] pds, Object bean, String beanName) throws BeansException {
+        return postProcessProperties(pvs, bean, beanName);
+    }
 
+    /**
+     * Alternatives to the {@link #postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String)}.
+     * @see #postProcessPropertyValues
+     */
+    @Override
+    public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName)
+        throws BeansException {
         try {
             AnnotatedInjectionMetadata metadata = findInjectionMetadata(beanName, bean.getClass(), pvs);
             prepareInjection(metadata);
@@ -318,7 +337,7 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
             throw ex;
         } catch (Throwable ex) {
             throw new BeanCreationException(beanName, "Injection of @" + getAnnotationType().getSimpleName()
-                    + " dependencies is failed", ex);
+                + " dependencies is failed", ex);
         }
         return pvs;
     }
@@ -365,7 +384,7 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
 
         boolean renameable = true;
         // referenceBeanName
-        String referenceBeanName = getAttribute(attributes, ReferenceAttributes.ID);
+        String referenceBeanName = AnnotationUtils.getAttribute(attributes, ReferenceAttributes.ID);
         if (hasText(referenceBeanName)) {
             renameable = false;
         } else {
@@ -396,8 +415,22 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
         }
 
         //check bean definition
-        if (beanDefinitionRegistry.containsBeanDefinition(referenceBeanName)) {
-            BeanDefinition prevBeanDefinition = beanDefinitionRegistry.getBeanDefinition(referenceBeanName);
+        boolean isContains;
+        if ((isContains = beanDefinitionRegistry.containsBeanDefinition(referenceBeanName)) || beanDefinitionRegistry.isAlias(referenceBeanName)) {
+            String preReferenceBeanName = referenceBeanName;
+            if (!isContains){
+                // Look in the alias for the origin bean name
+                String[] aliases = beanDefinitionRegistry.getAliases(referenceBeanName);
+                if (ArrayUtils.isNotEmpty(aliases)) {
+                    for (String alias : aliases) {
+                        if (beanDefinitionRegistry.containsBeanDefinition(alias)) {
+                            preReferenceBeanName = alias;
+                            break;
+                        }
+                    }
+                }
+            }
+            BeanDefinition prevBeanDefinition = beanDefinitionRegistry.getBeanDefinition(preReferenceBeanName);
             String prevBeanType = prevBeanDefinition.getBeanClassName();
             String prevBeanDesc = referenceBeanName + "[" + prevBeanType + "]";
             String newBeanDesc = referenceBeanName + "[" + referenceKey + "]";
@@ -436,7 +469,7 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
             }
             newBeanDesc = newReferenceBeanName + "[" + referenceKey + "]";
 
-            logger.warn("Already exists another bean definition with the same bean name [" + referenceBeanName + "], " +
+            logger.warn(CONFIG_DUBBO_BEAN_INITIALIZER, "", "", "Already exists another bean definition with the same bean name [" + referenceBeanName + "], " +
                 "rename dubbo reference bean to [" + newReferenceBeanName + "]. " +
                 "It is recommended to modify the name of one of the beans to avoid injection problems. " +
                 "prev: " + prevBeanDesc + ", new: " + newBeanDesc + ". " + checkLocation);
@@ -507,7 +540,8 @@ public class ReferenceAnnotationBeanPostProcessor extends AbstractAnnotationBean
 
     /**
      * Gets all beans of {@link ReferenceBean}
-     * @deprecated  use {@link ReferenceBeanManager.getReferences()} instead
+     *
+     * @deprecated use {@link ReferenceBeanManager#getReferences()} instead
      */
     @Deprecated
     public Collection<ReferenceBean<?>> getReferenceBeans() {

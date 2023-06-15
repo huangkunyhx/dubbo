@@ -25,61 +25,61 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ClassUtilsTest {
+class ClassUtilsTest {
 
     @Test
-    public void testNewInstance() {
+    void testNewInstance() {
         HelloServiceImpl0 instance = (HelloServiceImpl0) ClassUtils.newInstance(HelloServiceImpl0.class.getName());
         Assertions.assertEquals("Hello world!", instance.sayHello());
     }
 
     @Test
-    public void testNewInstance0() {
+    void testNewInstance0() {
         Assertions.assertThrows(IllegalStateException.class, () -> ClassUtils.newInstance(PrivateHelloServiceImpl.class.getName()));
     }
 
     @Test
-    public void testNewInstance1() {
+    void testNewInstance1() {
         Assertions.assertThrows(IllegalStateException.class, () -> ClassUtils.newInstance("org.apache.dubbo.common.compiler.support.internal.HelloServiceInternalImpl"));
     }
 
     @Test
-    public void testNewInstance2() {
+    void testNewInstance2() {
         Assertions.assertThrows(IllegalStateException.class, () -> ClassUtils.newInstance("org.apache.dubbo.common.compiler.support.internal.NotExistsImpl"));
     }
 
     @Test
-    public void testForName() {
+    void testForName() {
         ClassUtils.forName(new String[]{"org.apache.dubbo.common.compiler.support"}, "HelloServiceImpl0");
     }
 
     @Test
-    public void testForName1() {
+    void testForName1() {
         Assertions.assertThrows(IllegalStateException.class, () -> ClassUtils.forName(new String[]{"org.apache.dubbo.common.compiler.support"}, "HelloServiceImplXX"));
     }
 
     @Test
-    public void testForName2() {
-        ClassUtils.forName("boolean");
-        ClassUtils.forName("byte");
-        ClassUtils.forName("char");
-        ClassUtils.forName("short");
-        ClassUtils.forName("int");
-        ClassUtils.forName("long");
-        ClassUtils.forName("float");
-        ClassUtils.forName("double");
-        ClassUtils.forName("boolean[]");
-        ClassUtils.forName("byte[]");
-        ClassUtils.forName("char[]");
-        ClassUtils.forName("short[]");
-        ClassUtils.forName("int[]");
-        ClassUtils.forName("long[]");
-        ClassUtils.forName("float[]");
-        ClassUtils.forName("double[]");
+    void testForName2() {
+        Assertions.assertEquals(boolean.class, ClassUtils.forName("boolean"));
+        Assertions.assertEquals(byte.class, ClassUtils.forName("byte"));
+        Assertions.assertEquals(char.class, ClassUtils.forName("char"));
+        Assertions.assertEquals(short.class, ClassUtils.forName("short"));
+        Assertions.assertEquals(int.class, ClassUtils.forName("int"));
+        Assertions.assertEquals(long.class, ClassUtils.forName("long"));
+        Assertions.assertEquals(float.class, ClassUtils.forName("float"));
+        Assertions.assertEquals(double.class, ClassUtils.forName("double"));
+        Assertions.assertEquals(boolean[].class, ClassUtils.forName("boolean[]"));
+        Assertions.assertEquals(byte[].class, ClassUtils.forName("byte[]"));
+        Assertions.assertEquals(char[].class, ClassUtils.forName("char[]"));
+        Assertions.assertEquals(short[].class, ClassUtils.forName("short[]"));
+        Assertions.assertEquals(int[].class, ClassUtils.forName("int[]"));
+        Assertions.assertEquals(long[].class, ClassUtils.forName("long[]"));
+        Assertions.assertEquals(float[].class, ClassUtils.forName("float[]"));
+        Assertions.assertEquals(double[].class, ClassUtils.forName("double[]"));
     }
 
     @Test
-    public void testGetBoxedClass() {
+    void testGetBoxedClass() {
         Assertions.assertEquals(Boolean.class, ClassUtils.getBoxedClass(boolean.class));
         Assertions.assertEquals(Character.class, ClassUtils.getBoxedClass(char.class));
         Assertions.assertEquals(Byte.class, ClassUtils.getBoxedClass(byte.class));
@@ -92,7 +92,7 @@ public class ClassUtilsTest {
     }
 
     @Test
-    public void testBoxedAndUnboxed() {
+    void testBoxedAndUnboxed() {
         Assertions.assertEquals(Boolean.valueOf(true), ClassUtils.boxed(true));
         Assertions.assertEquals(Character.valueOf('0'), ClassUtils.boxed('0'));
         Assertions.assertEquals(Byte.valueOf((byte) 0), ClassUtils.boxed((byte) 0));
@@ -113,7 +113,7 @@ public class ClassUtilsTest {
     }
 
     @Test
-    public void testGetSize() {
+    void testGetSize() {
         Assertions.assertEquals(0, ClassUtils.getSize(null));
         List<Integer> list = new ArrayList<>();
         list.add(1);
@@ -127,17 +127,17 @@ public class ClassUtilsTest {
     }
 
     @Test
-    public void testToUri() {
+    void testToUri() {
         Assertions.assertThrows(RuntimeException.class, () -> ClassUtils.toURI("#xx_abc#hello"));
     }
 
     @Test
-    public void testGetSizeMethod() {
+    void testGetSizeMethod() {
         Assertions.assertEquals("getLength()", ClassUtils.getSizeMethod(GenericClass3.class));
     }
     
     @Test
-    public void testGetSimpleClassName() {
+    void testGetSimpleClassName() {
         Assertions.assertNull(ClassUtils.getSimpleClassName(null));
         Assertions.assertEquals("Map", ClassUtils.getSimpleClassName(Map.class.getName()));
         Assertions.assertEquals("Map", ClassUtils.getSimpleClassName(Map.class.getSimpleName()));

@@ -16,6 +16,8 @@
  */
 package org.apache.dubbo.config.spring.context;
 
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.config.AbstractConfig;
 import org.apache.dubbo.config.ApplicationConfig;
 import org.apache.dubbo.config.ConsumerConfig;
@@ -27,14 +29,13 @@ import org.apache.dubbo.config.ProtocolConfig;
 import org.apache.dubbo.config.ProviderConfig;
 import org.apache.dubbo.config.RegistryConfig;
 import org.apache.dubbo.config.SslConfig;
+import org.apache.dubbo.config.TracingConfig;
 import org.apache.dubbo.config.context.AbstractConfigManager;
 import org.apache.dubbo.config.context.ConfigManager;
 import org.apache.dubbo.config.spring.ConfigCenterBean;
 import org.apache.dubbo.config.spring.reference.ReferenceBeanManager;
 import org.apache.dubbo.rpc.model.ModuleModel;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.FatalBeanException;
 import org.springframework.beans.factory.BeanFactory;
@@ -59,9 +60,9 @@ public class DubboConfigBeanInitializer implements BeanFactoryAware, Initializin
 
     public static String BEAN_NAME = "dubboConfigBeanInitializer";
 
-    private final Log logger = LogFactory.getLog(getClass());
+    private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private AtomicBoolean initialized = new AtomicBoolean(false);
+    private final AtomicBoolean initialized = new AtomicBoolean(false);
     private ConfigurableListableBeanFactory beanFactory;
     private ReferenceBeanManager referenceBeanManager;
 
@@ -109,6 +110,7 @@ public class DubboConfigBeanInitializer implements BeanFactoryAware, Initializin
         loadConfigBeansOfType(ConfigCenterBean.class, configManager);
         loadConfigBeansOfType(MetadataReportConfig.class, configManager);
         loadConfigBeansOfType(MetricsConfig.class, configManager);
+        loadConfigBeansOfType(TracingConfig.class, configManager);
         loadConfigBeansOfType(SslConfig.class, configManager);
 
         // load module config beans
