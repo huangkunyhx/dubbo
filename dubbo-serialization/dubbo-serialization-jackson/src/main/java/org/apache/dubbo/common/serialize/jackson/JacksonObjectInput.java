@@ -1,11 +1,28 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.dubbo.common.serialize.jackson;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.dubbo.common.serialize.ObjectInput;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Type;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * JacksonObjectInput
@@ -70,7 +87,8 @@ public class JacksonObjectInput implements ObjectInput {
         byte[] bytes = new byte[length];
         int read = is.read(bytes, 0, length);
         if (read != length) {
-            throw new IllegalArgumentException("deserialize failed. expected read length: " + length + " but actual read: " + read);
+            throw new IllegalArgumentException(
+                    "deserialize failed. expected read length: " + length + " but actual read: " + read);
         }
         return bytes;
     }
@@ -96,7 +114,8 @@ public class JacksonObjectInput implements ObjectInput {
         byte[] bytes = new byte[length];
         int read = is.read(bytes, 0, length);
         if (read != length) {
-            throw new IllegalArgumentException("deserialize failed. expected read length: " + length + " but actual read: " + read);
+            throw new IllegalArgumentException(
+                    "deserialize failed. expected read length: " + length + " but actual read: " + read);
         }
         if (null != type) {
             return this.objectMapper.readValue(bytes, this.objectMapper.constructType(type));
@@ -109,7 +128,8 @@ public class JacksonObjectInput implements ObjectInput {
         byte[] bytes = new byte[Integer.BYTES];
         int read = is.read(bytes, 0, Integer.BYTES);
         if (read != Integer.BYTES) {
-            throw new IllegalArgumentException("deserialize failed. expected read length: " + Integer.BYTES + " but actual read: " + read);
+            throw new IllegalArgumentException(
+                    "deserialize failed. expected read length: " + Integer.BYTES + " but actual read: " + read);
         }
         int value = 0;
         for (byte b : bytes) {
