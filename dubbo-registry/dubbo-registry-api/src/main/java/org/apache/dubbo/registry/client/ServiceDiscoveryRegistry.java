@@ -133,6 +133,7 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
         return factory.getServiceDiscovery(registryURL);
     }
 
+    @Override
     protected boolean shouldRegister(URL providerURL) {
 
         String side = providerURL.getSide();
@@ -455,6 +456,7 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
                                 oldListener.removeListener(url.getServiceKey(), listener);
                                 if (!oldListener.hasListeners()) {
                                     oldListener.destroy();
+                                    serviceListeners.remove(appKey);
                                     removeAppSubscriptionLock(appKey);
                                 }
                             } finally {

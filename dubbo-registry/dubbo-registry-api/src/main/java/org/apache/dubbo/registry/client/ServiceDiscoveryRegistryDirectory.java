@@ -31,6 +31,7 @@ import org.apache.dubbo.common.utils.Assert;
 import org.apache.dubbo.common.utils.CollectionUtils;
 import org.apache.dubbo.common.utils.ConcurrentHashMapUtils;
 import org.apache.dubbo.common.utils.NetUtils;
+import org.apache.dubbo.common.utils.StringUtils;
 import org.apache.dubbo.metadata.MetadataInfo;
 import org.apache.dubbo.registry.AddressListener;
 import org.apache.dubbo.registry.Constants;
@@ -70,6 +71,7 @@ import static org.apache.dubbo.common.constants.CommonConstants.APPLICATION_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.DISABLED_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.ENABLED_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.INSTANCE_REGISTER_MODE;
+import static org.apache.dubbo.common.constants.CommonConstants.IS_EXTRA;
 import static org.apache.dubbo.common.constants.CommonConstants.PROTOCOL_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.SIDE_KEY;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.PROTOCOL_FAILED_DESTROY_INVOKER;
@@ -449,6 +451,17 @@ public class ServiceDiscoveryRegistryDirectory<T> extends DynamicDirectory<T> {
             List<ProtocolServiceKey> matchedProtocolServiceKeys =
                     instanceAddressURL.getMetadataInfo().getMatchedServiceInfos(consumerProtocolServiceKey).stream()
                             .filter(serviceInfo -> serviceInfo.getPort() <= 0 || serviceInfo.getPort() == port)
+                            // special filter for extra protocols.
+                            .filter(serviceInfo -> {
+                                if (StringUtils.isNotEmpty(
+                                        consumerProtocolServiceKey
+                                                .getProtocol())) { // if consumer side protocol is specified, use all
+                                    // the protocols we got in hand now directly
+                                    return true;
+                                } else { // if consumer side protocol is not specified, remove all extra protocols
+                                    return StringUtils.isEmpty(serviceInfo.getParameter(IS_EXTRA));
+                                }
+                            })
                             .map(MetadataInfo.ServiceInfo::getProtocolServiceKey)
                             .collect(Collectors.toList());
 
@@ -778,6 +791,12 @@ public class ServiceDiscoveryRegistryDirectory<T> extends DynamicDirectory<T> {
                     invocation instanceof RpcInvocation ? ((RpcInvocation) invocation).getInvokeMode() : null);
             copiedInvocation.setObjectAttachment(CommonConstants.GROUP_KEY, protocolServiceKey.getGroup());
             copiedInvocation.setObjectAttachment(CommonConstants.VERSION_KEY, protocolServiceKey.getVersion());
+            // When there are multiple MethodDescriptors with the same method name, the return type will be wrong
+            // same with org.apache.dubbo.rpc.stub.StubInvocationUtil.call
+            // fix https://github.com/apache/dubbo/issues/13931
+            if (invocation instanceof RpcInvocation) {
+                copiedInvocation.setReturnType(((RpcInvocation) invocation).getReturnType());
+            }
             return originInvoker.invoke(copiedInvocation);
         }
 

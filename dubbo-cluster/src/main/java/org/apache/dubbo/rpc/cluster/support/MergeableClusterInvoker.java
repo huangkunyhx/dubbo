@@ -16,10 +16,12 @@
  */
 package org.apache.dubbo.rpc.cluster.support;
 
+import org.apache.dubbo.common.constants.LoggerCodeConstants;
 import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
 import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.utils.ConfigUtils;
 import org.apache.dubbo.rpc.AsyncRpcResult;
+import org.apache.dubbo.rpc.Constants;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Result;
@@ -41,8 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.dubbo.common.constants.LoggerCodeConstants.CLUSTER_FAILED_GROUP_MERGE;
-import static org.apache.dubbo.rpc.Constants.ASYNC_KEY;
 import static org.apache.dubbo.rpc.Constants.MERGER_KEY;
 
 /**
@@ -69,8 +69,10 @@ public class MergeableClusterInvoker<T> extends AbstractClusterInvoker<T> {
                         return invokeWithContext(invoker, invocation);
                     } catch (RpcException e) {
                         if (e.isNoInvokerAvailableAfterFilter()) {
-                            log.debug("No available provider for service" + getUrl().getServiceKey() + " on group "
-                                    + invoker.getUrl().getGroup() + ", will continue to try another group.");
+                            log.debug(
+                                    "No available provider for service" + getUrl().getServiceKey() + " on group "
+                                            + invoker.getUrl().getGroup() + ", will continue to try another group.",
+                                    e);
                         } else {
                             throw e;
                         }
@@ -92,8 +94,22 @@ public class MergeableClusterInvoker<T> extends AbstractClusterInvoker<T> {
         Map<String, Result> results = new HashMap<>();
         for (final Invoker<T> invoker : invokers) {
             RpcInvocation subInvocation = new RpcInvocation(invocation, invoker);
-            subInvocation.setAttachment(ASYNC_KEY, "true");
-            results.put(invoker.getUrl().getServiceKey(), invokeWithContext(invoker, subInvocation));
+            subInvocation.setAttachment(Constants.ASYNC_KEY, "true");
+            try {
+                results.put(invoker.getUrl().getServiceKey(), invokeWithContext(invoker, subInvocation));
+            } catch (RpcException e) {
+                if (e.isNoInvokerAvailableAfterFilter()) {
+                    log.warn(
+                            LoggerCodeConstants.CLUSTER_NO_VALID_PROVIDER,
+                            e.getCause().getMessage(),
+                            "",
+                            "No available provider for service" + getUrl().getServiceKey() + " on group "
+                                    + invoker.getUrl().getGroup() + ", will continue to try another group.",
+                            e);
+                } else {
+                    throw e;
+                }
+            }
         }
 
         Object result;
@@ -106,7 +122,7 @@ public class MergeableClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 Result r = asyncResult.get(Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
                 if (r.hasException()) {
                     log.error(
-                            CLUSTER_FAILED_GROUP_MERGE,
+                            LoggerCodeConstants.CLUSTER_FAILED_GROUP_MERGE,
                             "Invoke " + getGroupDescFromServiceKey(entry.getKey()) + " failed: "
                                     + r.getException().getMessage(),
                             "",

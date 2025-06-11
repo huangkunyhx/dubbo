@@ -16,12 +16,12 @@
  */
 package org.apache.dubbo.spring.boot.autoconfigure;
 
+import org.apache.dubbo.config.spring.context.config.ConfigurationBeanBinder;
 import org.apache.dubbo.config.spring.util.PropertySourcesUtils;
 
 import java.util.Map;
 import java.util.Set;
 
-import com.alibaba.spring.context.config.ConfigurationBeanBinder;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -51,7 +51,7 @@ import static org.springframework.beans.factory.config.ConfigurableBeanFactory.S
  * @see DubboRelaxedBindingAutoConfiguration
  * @since 2.7.0
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = DUBBO_PREFIX, name = "enabled", matchIfMissing = true)
 @ConditionalOnClass(name = "org.springframework.boot.context.properties.bind.Binder")
 @AutoConfigureBefore(DubboRelaxedBindingAutoConfiguration.class)

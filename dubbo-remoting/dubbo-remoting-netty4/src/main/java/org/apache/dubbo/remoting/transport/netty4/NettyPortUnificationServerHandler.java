@@ -30,6 +30,7 @@ import org.apache.dubbo.remoting.transport.netty4.ssl.SslContexts;
 
 import javax.net.ssl.SSLSession;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.handler.ssl.ApplicationProtocolNames;
+import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
@@ -51,14 +54,14 @@ public class NettyPortUnificationServerHandler extends ByteToMessageDecoder {
     private final URL url;
     private final ChannelHandler handler;
     private final boolean detectSsl;
-    private final List<WireProtocol> protocols;
+    private final Map<String, WireProtocol> protocols;
     private final Map<String, URL> urlMapper;
     private final Map<String, ChannelHandler> handlerMapper;
 
     public NettyPortUnificationServerHandler(
             URL url,
             boolean detectSsl,
-            List<WireProtocol> protocols,
+            Map<String, WireProtocol> protocols,
             ChannelHandler handler,
             Map<String, URL> urlMapper,
             Map<String, ChannelHandler> handlerMapper) {
@@ -118,46 +121,7 @@ public class NettyPortUnificationServerHandler extends ByteToMessageDecoder {
         if (providerConnectionConfig != null && isSsl(in)) {
             enableSsl(ctx, providerConnectionConfig);
         } else {
-            for (final WireProtocol protocol : protocols) {
-                in.markReaderIndex();
-                ChannelBuffer buf = new NettyBackedChannelBuffer(in);
-                final ProtocolDetector.Result result = protocol.detector().detect(buf);
-                in.resetReaderIndex();
-                switch (result) {
-                    case UNRECOGNIZED:
-                        continue;
-                    case RECOGNIZED:
-                        String protocolName = url.getOrDefaultFrameworkModel()
-                                .getExtensionLoader(WireProtocol.class)
-                                .getExtensionName(protocol);
-                        ChannelHandler localHandler = this.handlerMapper.getOrDefault(protocolName, handler);
-                        URL localURL = this.urlMapper.getOrDefault(protocolName, url);
-                        channel.setUrl(localURL);
-                        NettyConfigOperator operator = new NettyConfigOperator(channel, localHandler);
-                        protocol.configServerProtocolHandler(url, operator);
-                        ctx.pipeline().remove(this);
-                    case NEED_MORE_DATA:
-                        return;
-                    default:
-                        return;
-                }
-            }
-            byte[] preface = new byte[in.readableBytes()];
-            in.readBytes(preface);
-            Set<String> supported = url.getApplicationModel()
-                    .getExtensionLoader(WireProtocol.class)
-                    .getSupportedExtensions();
-            LOGGER.error(
-                    INTERNAL_ERROR,
-                    "unknown error in remoting module",
-                    "",
-                    String.format(
-                            "Can not recognize protocol from downstream=%s . " + "preface=%s protocols=%s",
-                            ctx.channel().remoteAddress(), Bytes.bytes2hex(preface), supported));
-
-            // Unknown protocol; discard everything and close the connection.
-            in.clear();
-            ctx.close();
+            detectProtocol(ctx, url, channel, in);
         }
     }
 
@@ -168,6 +132,17 @@ public class NettyPortUnificationServerHandler extends ByteToMessageDecoder {
         p.addLast(
                 "unificationA",
                 new NettyPortUnificationServerHandler(url, false, protocols, handler, urlMapper, handlerMapper));
+        p.addLast("ALPN", new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
+            @Override
+            protected void configurePipeline(ChannelHandlerContext ctx, String protocol) throws Exception {
+                if (!ApplicationProtocolNames.HTTP_2.equals(protocol)) {
+                    return;
+                }
+                NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);
+                ByteBuf in = ctx.alloc().buffer();
+                detectProtocol(ctx, url, channel, in);
+            }
+        });
         p.remove(this);
     }
 
@@ -177,5 +152,48 @@ public class NettyPortUnificationServerHandler extends ByteToMessageDecoder {
             return SslHandler.isEncrypted(buf);
         }
         return false;
+    }
+
+    private void detectProtocol(ChannelHandlerContext ctx, URL url, NettyChannel channel, ByteBuf in) {
+        Set<String> supportedProtocolNames = new HashSet<>(protocols.keySet());
+        supportedProtocolNames.retainAll(urlMapper.keySet());
+
+        for (final String name : supportedProtocolNames) {
+            WireProtocol protocol = protocols.get(name);
+            in.markReaderIndex();
+            ChannelBuffer buf = new NettyBackedChannelBuffer(in);
+            final ProtocolDetector.Result result = protocol.detector().detect(buf);
+            in.resetReaderIndex();
+            switch (result.flag()) {
+                case UNRECOGNIZED:
+                    continue;
+                case RECOGNIZED:
+                    ChannelHandler localHandler = this.handlerMapper.getOrDefault(name, handler);
+                    URL localURL = this.urlMapper.getOrDefault(name, url);
+                    channel.setUrl(localURL);
+                    NettyConfigOperator operator = new NettyConfigOperator(channel, localHandler);
+                    operator.setDetectResult(result);
+                    protocol.configServerProtocolHandler(url, operator);
+                    ctx.pipeline().remove(this);
+                case NEED_MORE_DATA:
+                    return;
+                default:
+                    return;
+            }
+        }
+        byte[] preface = new byte[in.readableBytes()];
+        in.readBytes(preface);
+        Set<String> supported = url.getApplicationModel().getSupportedExtensions(WireProtocol.class);
+        LOGGER.error(
+                INTERNAL_ERROR,
+                "unknown error in remoting module",
+                "",
+                String.format(
+                        "Can not recognize protocol from downstream=%s . " + "preface=%s protocols=%s",
+                        ctx.channel().remoteAddress(), Bytes.bytes2hex(preface), supported));
+
+        // Unknown protocol; discard everything and close the connection.
+        in.clear();
+        ctx.close();
     }
 }

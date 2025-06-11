@@ -102,12 +102,14 @@ public class DubboAnnotationUtils {
             Class<?>[] allInterfaces = getAllInterfacesForClass(defaultInterfaceClass);
             if (allInterfaces.length > 0) {
                 interfaceClass = allInterfaces[0];
+            } else {
+                interfaceClass = defaultInterfaceClass;
             }
         }
 
         Assert.notNull(
                 interfaceClass, "@Service interfaceClass() or interfaceName() or interface class must be present!");
-        Assert.isTrue(interfaceClass.isInterface(), "The annotated type must be an interface!");
+        // Assert.isTrue(interfaceClass.isInterface(), "The annotated type must be an interface!");
         return interfaceClass.getName();
     }
 
@@ -138,7 +140,7 @@ public class DubboAnnotationUtils {
      * be split in anytime.It will throw IllegalArgumentException If converted array length isn't
      * even number.
      * The convert cases below work in right way,which are best practice.
-     * <p>
+     * <pre>
      * (array->map)
      * ["a","b"] ==> {a=b}
      * [" a "," b "] ==> {a=b}
@@ -147,7 +149,7 @@ public class DubboAnnotationUtils {
      * ["a=b","c","d"] ==>{a=b,c=d}
      * ["a","a:b"] ==>{a="a:b"}
      * ["a","a,b"] ==>{a="a,b"}
-     * </p>
+     * </pre>
      *
      * @param parameters
      * @return

@@ -61,12 +61,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static org.apache.dubbo.common.constants.CommonConstants.APPLICATION_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.COMMA_SEPARATOR;
 import static org.apache.dubbo.common.constants.CommonConstants.DISABLED_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_PROTOCOL;
 import static org.apache.dubbo.common.constants.CommonConstants.ENABLED_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.EXT_PROTOCOL;
+import static org.apache.dubbo.common.constants.CommonConstants.GROUP_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.INTERFACE_REGISTER_MODE;
+import static org.apache.dubbo.common.constants.CommonConstants.PREFERRED_PROTOCOL;
 import static org.apache.dubbo.common.constants.CommonConstants.PROTOCOL_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.SIDE_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.VERSION_KEY;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.PROTOCOL_FAILED_INIT_SERIALIZATION_OPTIMIZER;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.PROTOCOL_FAILED_REFER_INVOKER;
 import static org.apache.dubbo.common.constants.LoggerCodeConstants.PROTOCOL_UNSUPPORTED;
@@ -445,6 +450,12 @@ public class RegistryDirectory<T> extends DynamicDirectory<T> {
             }
 
             URL url = mergeUrl(providerUrl);
+            // get the effective protocol that this consumer should consume based on consumer side protocol
+            // configuration and available protocols in address pool.
+            String effectiveProtocol = getEffectiveProtocol(queryProtocols, url);
+            if (!effectiveProtocol.equals(url.getProtocol())) {
+                url = url.setProtocol(effectiveProtocol);
+            }
 
             // Cache key is url that does not merge with consumer side parameters,
             // regardless of how the consumer combines parameters,
@@ -493,6 +504,45 @@ public class RegistryDirectory<T> extends DynamicDirectory<T> {
             }
         }
         return newUrlInvokerMap;
+    }
+
+    /**
+     * Get the protocol to consume by matching the consumer acceptable protocols and the available provider protocols.
+     * <p>
+     * Only the first protocol that can match with the provider protocols will be used if consumer set to accept multiple protocols.
+     * For example, if dubbo.consumer.protocol='tri,rest' is set and provider provides tri protocol, then consumer will use tri protocol to communicate with provider.
+     *
+     * @param queryProtocols consumer side protocols.
+     * @param url            provider url that have extra protocols specified.
+     * @return the protocol to consume.
+     */
+    private String getEffectiveProtocol(String queryProtocols, URL url) {
+        String protocol = url.getProtocol();
+        String prioritizedProtocol = url.getParameter(PREFERRED_PROTOCOL, protocol);
+
+        String effectiveProtocol = prioritizedProtocol;
+
+        if (StringUtils.isNotEmpty(queryProtocols)) {
+            String[] acceptProtocols = queryProtocols.split(COMMA_SEPARATOR);
+            String acceptedProtocol = acceptProtocols[0];
+            if (!acceptedProtocol.equals(prioritizedProtocol)) {
+                if (!acceptedProtocol.equals(protocol)) {
+                    String extProtocols = url.getParameter(EXT_PROTOCOL);
+                    if (StringUtils.isNotEmpty(extProtocols)) {
+                        String[] extProtocolsArr = extProtocols.split(COMMA_SEPARATOR);
+                        for (String p : extProtocolsArr) {
+                            if (p.equalsIgnoreCase(acceptedProtocol)) {
+                                effectiveProtocol = acceptedProtocol;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    effectiveProtocol = protocol;
+                }
+            }
+        }
+        return effectiveProtocol;
     }
 
     private boolean checkProtocolValid(String queryProtocols, URL providerUrl) {
@@ -610,10 +660,14 @@ public class RegistryDirectory<T> extends DynamicDirectory<T> {
                 if (overriddenURL == null) {
                     String appName = interfaceAddressURL.getApplication();
                     String side = interfaceAddressURL.getSide();
+                    String group = interfaceAddressURL.getGroup();
+                    String version = interfaceAddressURL.getVersion();
                     overriddenURL = URLBuilder.from(interfaceAddressURL)
                             .clearParameters()
                             .addParameter(APPLICATION_KEY, appName)
                             .addParameter(SIDE_KEY, side)
+                            .addParameter(GROUP_KEY, group)
+                            .addParameter(VERSION_KEY, version)
                             .build();
                 }
                 for (Configurator configurator : configurators) {

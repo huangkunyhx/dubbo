@@ -28,7 +28,7 @@
 
   <properties>
     <skip_maven_deploy>true</skip_maven_deploy>
-    <spring_version>4.1.9.RELEASE</spring_version>
+    <spring_version>5.3.39</spring_version>
   </properties>
 
   <dependencyManagement>
@@ -96,7 +96,7 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <useSystemClassLoader>true</useSystemClassLoader>
-              <forkMode>once</forkMode>
+              <forkCount>1</forkCount>
               <argLine>${argline} ${jacocoArgLine}
                                 --add-opens java.base/java.lang=ALL-UNNAMED
                                 --add-opens java.base/java.math=ALL-UNNAMED

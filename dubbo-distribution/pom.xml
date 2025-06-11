@@ -28,7 +28,7 @@
   <packaging>pom</packaging>
 
   <properties>
-    <spotless-maven-plugin.version>2.40.0</spotless-maven-plugin.version>
+    <spotless-maven-plugin.version>2.43.0</spotless-maven-plugin.version>
     <spotless.action>check</spotless.action>
     <dubbo-shared-resources.version>1.0.0</dubbo-shared-resources.version>
     <palantirJavaFormat.version>2.38.0</palantirJavaFormat.version>
@@ -39,6 +39,7 @@
       <id>release</id>
       <modules>
         <module>dubbo-all</module>
+        <module>dubbo-all-shaded</module>
         <module>dubbo-apache-release</module>
         <module>dubbo-bom</module>
         <module>dubbo-core-spi</module>
@@ -113,6 +114,12 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <id>skip-spotless</id>
+      <properties>
+        <spotless.skip>true</spotless.skip>
+      </properties>
     </profile>
   </profiles>
 </project>

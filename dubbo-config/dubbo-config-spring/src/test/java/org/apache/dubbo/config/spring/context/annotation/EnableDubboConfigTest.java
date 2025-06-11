@@ -35,7 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.PropertySource;
 
-import static com.alibaba.spring.util.BeanRegistrar.hasAlias;
+import static org.apache.dubbo.config.spring.util.BeanRegistrar.hasAlias;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
@@ -115,7 +115,6 @@ class EnableDubboConfigTest {
 
         configManager.getProtocol("dubbo").get();
         configManager.getProtocol("rest").get();
-        configManager.getProtocol("thrift").get();
 
         // asserts aliases
         //        assertTrue(hasAlias(context, "applicationBean2", "dubbo-demo-application2"));
